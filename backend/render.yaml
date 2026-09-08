@@ -1,0 +1,7 @@
+services:
+  - type: web
+    name: oxyzen-api
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    dockerContext: ./
+    healthCheckPath: /api/

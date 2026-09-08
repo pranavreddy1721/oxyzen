@@ -1,0 +1,193 @@
+import { useEffect, useState, Suspense, lazy } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { ArrowRight, Activity, Search, Brain, ShieldCheck, Wind, Map as MapIcon, Sparkles, BookOpen, HeartPulse, LineChart } from "lucide-react";
+import api from "@/lib/api";
+import { useLocation } from "@/context/LocationContext";
+import { aqiCategory, textOn } from "@/lib/aqiColors";
+import LocationSearch from "@/components/LocationSearch";
+import AQIChart from "@/components/AQIChart";
+import { Button } from "@/components/ui/button";
+import { CardSkeleton } from "@/components/states";
+
+const EarthGlobe = lazy(() => import("@/components/EarthGlobe"));
+
+const STEPS = [
+  { n: "01", title: "Monitor", desc: "Real-time air-quality data for any location on Earth.", icon: Activity },
+  { n: "02", title: "Analyze", desc: "Six pollutants and AQI broken down and explained.", icon: Search },
+  { n: "03", title: "Predict", desc: "Explainable environmental health-risk assessment.", icon: Brain },
+  { n: "04", title: "Protect", desc: "Actionable, non-diagnostic preventive guidance.", icon: ShieldCheck },
+];
+
+const RESOURCES = [
+  { to: "/aqi-info", title: "What is AQI?", desc: "How the Air Quality Index works and how to read it.", icon: BookOpen },
+  { to: "/tips", title: "Health Tips", desc: "Practical indoor & outdoor pollution precautions.", icon: HeartPulse },
+  { to: "/masks", title: "Masks Info", desc: "How particulate-filtering masks generally work.", icon: ShieldCheck },
+];
+
+export default function Home() {
+  const navigate = useNavigate();
+  const { location, setLocation } = useLocation();
+  const [markers, setMarkers] = useState([]);
+  const [preview, setPreview] = useState(null);
+  const [history, setHistory] = useState([]);
+
+  useEffect(() => {
+    api.get("/map").then(({ data }) => setMarkers(data.locations)).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    const p = { params: { locationId: location.id, lat: location.lat, lon: location.lon } };
+    api.get("/aqi/current", p).then(({ data }) => setPreview(data)).catch(() => setPreview(null));
+    api.get("/aqi/history", { params: { ...p.params, range: "7d" } }).then(({ data }) => setHistory(data.points)).catch(() => {});
+  }, [location]);
+
+  const goMonitor = (loc) => { setLocation(loc); navigate("/aqi-monitor"); };
+
+  const cat = preview ? aqiCategory(preview.aqi) : null;
+
+  return (
+    <div>
+      {/* HERO */}
+      <section className="relative overflow-hidden border-b border-border noise-overlay">
+        <div className="absolute inset-0 tech-grid opacity-[0.35]" style={{ maskImage: "radial-gradient(ellipse at top right, black, transparent 70%)" }} />
+        <div className="mx-auto grid max-w-7xl grid-cols-1 gap-8 px-4 pb-8 pt-12 sm:px-6 md:grid-cols-12 md:pt-16 lg:px-8">
+          <div className="z-10 flex flex-col justify-center md:col-span-6 lg:col-span-5">
+            <span className="mb-5 inline-flex w-fit items-center gap-2 rounded-full border border-border bg-card px-3 py-1.5 text-xs font-medium text-muted-foreground">
+              <span className="h-2 w-2 rounded-full bg-primary" /> Air Quality Intelligence Platform
+            </span>
+            <h1 className="font-heading text-4xl font-black leading-[1.05] tracking-tight sm:text-5xl lg:text-6xl">
+              Understand Your Air.<br />
+              <span className="text-primary">Understand Your Health.</span>
+            </h1>
+            <p className="mt-6 max-w-md text-base text-muted-foreground">
+              Real-time air-quality monitoring, multi-pollutant analysis and explainable health-risk insights for the world around you.
+            </p>
+            <div className="mt-8 max-w-xl">
+              <LocationSearch onSelect={goMonitor} size="lg" />
+            </div>
+            <div className="mt-6 flex flex-wrap gap-3">
+              <Button size="lg" onClick={() => navigate("/aqi-monitor")} data-testid="hero-cta-primary">
+                Open AQI Monitor <ArrowRight className="ml-2 h-4 w-4" strokeWidth={1.5} />
+              </Button>
+              <Button size="lg" variant="outline" onClick={() => navigate("/map")} data-testid="hero-cta-secondary">
+                Explore Global Map
+              </Button>
+            </div>
+          </div>
+
+          <div className="relative h-[42vh] min-h-[320px] w-full md:col-span-6 md:h-[70vh] lg:col-span-7">
+            <Suspense fallback={<div className="flex h-full w-full items-center justify-center text-muted-foreground">Loading globe…</div>}>
+              <EarthGlobe markers={markers} />
+            </Suspense>
+          </div>
+        </div>
+      </section>
+
+      {/* LIVE PREVIEW */}
+      <section className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
+        <div className="mb-8 flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-end">
+          <div>
+            <h2 className="font-heading text-3xl font-black tracking-tight">Live Air Quality</h2>
+            <p className="mt-1 text-muted-foreground">Current conditions for <span className="font-semibold text-foreground">{location.name}</span></p>
+          </div>
+          <Button variant="outline" onClick={() => navigate("/aqi-monitor")}>Full dashboard <ArrowRight className="ml-2 h-4 w-4" strokeWidth={1.5} /></Button>
+        </div>
+
+        {!preview ? (
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-3"><CardSkeleton /><CardSkeleton /><CardSkeleton /></div>
+        ) : (
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+            <div className="flex flex-col justify-between rounded-xl border border-border bg-card p-6">
+              <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Current AQI</p>
+              <div className="my-4">
+                <span className="font-data text-6xl font-bold" style={{ color: cat.color }}>{preview.aqi}</span>
+              </div>
+              <span className="w-fit rounded-full px-3 py-1 text-xs font-bold" style={{ background: cat.color, color: textOn(cat.color) }}>{preview.category}</span>
+            </div>
+            <div className="rounded-xl border border-border bg-card p-6">
+              <p className="mb-4 text-xs font-semibold uppercase tracking-widest text-muted-foreground">Key pollutants</p>
+              <div className="space-y-3">
+                {["pm25", "pm10", "o3"].map((k) => (
+                  <div key={k} className="flex items-center justify-between">
+                    <span className="text-sm font-medium">{preview.pollutantMeta[k].name}</span>
+                    <span className="font-data text-sm">{preview.pollutants[k]} <span className="text-xs text-muted-foreground">{preview.pollutantMeta[k].unit}</span></span>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="rounded-xl border border-border bg-card p-6">
+              <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-muted-foreground">7-day AQI trend</p>
+              <AQIChart data={history} color={cat.color} height={150} />
+            </div>
+          </div>
+        )}
+      </section>
+
+      {/* HOW IT WORKS */}
+      <section className="border-y border-border bg-card/40">
+        <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
+          <h2 className="font-heading text-3xl font-black tracking-tight">How OxyZen Works</h2>
+          <p className="mt-1 max-w-xl text-muted-foreground">Don't just see the AQI — understand what it means for your health and what to do about it.</p>
+          <div className="mt-10 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
+            {STEPS.map((s) => (
+              <div key={s.n} className="relative rounded-xl border border-border bg-card p-6">
+                <span className="font-data text-sm text-primary">{s.n}</span>
+                <s.icon className="my-4 h-7 w-7 text-primary" strokeWidth={1.5} />
+                <h3 className="font-heading text-lg font-bold">{s.title}</h3>
+                <p className="mt-2 text-sm text-muted-foreground">{s.desc}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* GLOBAL + RISK */}
+      <section className="mx-auto grid max-w-7xl grid-cols-1 gap-6 px-4 py-16 sm:px-6 lg:grid-cols-2 lg:px-8">
+        <div className="flex flex-col justify-between rounded-xl border border-border bg-card p-8">
+          <div>
+            <MapIcon className="mb-4 h-8 w-8 text-primary" strokeWidth={1.5} />
+            <h3 className="font-heading text-2xl font-black tracking-tight">Global Pollution Map</h3>
+            <p className="mt-2 text-muted-foreground">Explore real-time air quality across cities worldwide with a severity-coded interactive map.</p>
+          </div>
+          <Link to="/map" className="mt-6 inline-flex items-center font-medium text-primary hover:underline">Open the map <ArrowRight className="ml-1.5 h-4 w-4" strokeWidth={1.5} /></Link>
+        </div>
+        <div className="flex flex-col justify-between rounded-xl border border-border bg-card p-8">
+          <div>
+            <Brain className="mb-4 h-8 w-8 text-primary" strokeWidth={1.5} />
+            <h3 className="font-heading text-2xl font-black tracking-tight">Explainable Health Risk</h3>
+            <p className="mt-2 text-muted-foreground">A transparent scoring engine shows which pollutants drive your risk — not just a label, but the reasoning behind it.</p>
+          </div>
+          <Link to="/aqi-monitor" className="mt-6 inline-flex items-center font-medium text-primary hover:underline">See your risk <ArrowRight className="ml-1.5 h-4 w-4" strokeWidth={1.5} /></Link>
+        </div>
+      </section>
+
+      {/* AI + RESOURCES */}
+      <section className="border-t border-border bg-card/40">
+        <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
+          <div className="mb-10 flex flex-col items-start gap-6 rounded-xl border border-border bg-card p-8 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex items-start gap-4">
+              <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary text-primary-foreground"><Sparkles className="h-6 w-6" strokeWidth={1.5} /></span>
+              <div>
+                <h3 className="font-heading text-2xl font-black tracking-tight">Meet OxyZen AI</h3>
+                <p className="mt-1 max-w-xl text-muted-foreground">A context-aware assistant for questions about pollution, health impacts, and precautions. Ask "Is it safe to run today?" and get an answer based on your current air.</p>
+              </div>
+            </div>
+            <p className="text-sm text-muted-foreground">Tap the <span className="font-semibold text-primary">glowing button</span> anytime →</p>
+          </div>
+
+          <h2 className="mb-6 font-heading text-3xl font-black tracking-tight">Educational Resources</h2>
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
+            {RESOURCES.map((r) => (
+              <Link key={r.to} to={r.to} className="group rounded-xl border border-border bg-card p-6 transition-transform hover:-translate-y-1 hover:border-primary" data-testid={`resource-${r.to.slice(1)}`}>
+                <r.icon className="mb-4 h-7 w-7 text-primary" strokeWidth={1.5} />
+                <h3 className="font-heading text-lg font-bold">{r.title}</h3>
+                <p className="mt-2 text-sm text-muted-foreground">{r.desc}</p>
+                <span className="mt-4 inline-flex items-center text-sm font-medium text-primary">Learn more <ArrowRight className="ml-1.5 h-4 w-4 transition-transform group-hover:translate-x-1" strokeWidth={1.5} /></span>
+              </Link>
+            ))}
+          </div>
+        </div>
+      </section>
+    </div>
+  );
+}

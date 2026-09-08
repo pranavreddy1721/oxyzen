@@ -1,0 +1,13 @@
+{
+  "name": "oxyzen-cloudflare",
+  "private": true,
+  "scripts": {
+    "install:frontend": "npm --prefix frontend install",
+    "build": "npm --prefix frontend run build",
+    "dev": "npm --prefix frontend start",
+    "deploy": "npm run build && wrangler deploy"
+  },
+  "devDependencies": {
+    "wrangler": "latest"
+  }
+}
