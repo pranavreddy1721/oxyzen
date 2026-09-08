@@ -5,6 +5,9 @@ import requests
 logger=logging.getLogger("oxyzen.aqi_data")
 WAQI_BASE="https://api.waqi.info"; GEOCODING_URL="https://geocoding-api.open-meteo.com/v1/search"
 _EXTERNAL_LOCATIONS={}; _GEOCODE_CACHE={}; _GEOCODE_CACHE_TTL=600
+# Known CPCB/WAQI stations for Kolhapur. Direct station feeds are more reliable
+# than relying on WAQI's geo resolver for this city.
+WAQI_STATIONS={"kolhapur":["A567994","A567991"]}
 CITIES=[
 {"id":"delhi","name":"Delhi","country":"India","lat":28.6139,"lon":77.2090},{"id":"mumbai","name":"Mumbai","country":"India","lat":19.076,"lon":72.8777},{"id":"kolhapur","name":"Kolhapur","country":"India","lat":16.705,"lon":74.2433},{"id":"pune","name":"Pune","country":"India","lat":18.5204,"lon":73.8567},{"id":"bengaluru","name":"Bengaluru","country":"India","lat":12.9716,"lon":77.5946},{"id":"kolkata","name":"Kolkata","country":"India","lat":22.5726,"lon":88.3639},{"id":"beijing","name":"Beijing","country":"China","lat":39.9042,"lon":116.4074},{"id":"shanghai","name":"Shanghai","country":"China","lat":31.2304,"lon":121.4737},{"id":"lahore","name":"Lahore","country":"Pakistan","lat":31.5204,"lon":74.3587},{"id":"dhaka","name":"Dhaka","country":"Bangladesh","lat":23.8103,"lon":90.4125},{"id":"london","name":"London","country":"United Kingdom","lat":51.5074,"lon":-0.1278},{"id":"paris","name":"Paris","country":"France","lat":48.8566,"lon":2.3522},{"id":"newyork","name":"New York","country":"United States","lat":40.7128,"lon":-74.006},{"id":"losangeles","name":"Los Angeles","country":"United States","lat":34.0522,"lon":-118.2437},{"id":"tokyo","name":"Tokyo","country":"Japan","lat":35.6762,"lon":139.6503},{"id":"seoul","name":"Seoul","country":"South Korea","lat":37.5665,"lon":126.978},{"id":"sydney","name":"Sydney","country":"Australia","lat":-33.8688,"lon":151.2093},{"id":"zurich","name":"Zurich","country":"Switzerland","lat":47.3769,"lon":8.5417},{"id":"cairo","name":"Cairo","country":"Egypt","lat":30.0444,"lon":31.2357},{"id":"saopaulo","name":"São Paulo","country":"Brazil","lat":-23.5505,"lon":-46.6333},{"id":"mexicocity","name":"Mexico City","country":"Mexico","lat":19.4326,"lon":-99.1332},{"id":"dubai","name":"Dubai","country":"UAE","lat":25.2048,"lon":55.2708},{"id":"singapore","name":"Singapore","country":"Singapore","lat":1.3521,"lon":103.8198},{"id":"reykjavik","name":"Reykjavik","country":"Iceland","lat":64.1466,"lon":-21.9426}]
 POLLUTANT_META={k:{"key":k,"name":n,"unit":"AQI sub-index","reference":100,"full_name":full,"short":f"WAQI pollutant AQI sub-index for {full.lower()}.","what":"This value is a WAQI pollutant AQI sub-index, not a concentration measurement.","sources":[],"effects":[],"precautions":[]} for k,n,full in [("pm25","PM2.5","fine particulate matter"),("pm10","PM10","coarse particulate matter"),("o3","O₃","ground-level ozone"),("no2","NO₂","nitrogen dioxide"),("so2","SO₂","sulfur dioxide"),("co","CO","carbon monoxide")]} 
@@ -49,6 +52,17 @@ def _waqi_json(path,params=None):
  return payload.get("data") or {}
 
 def _waqi_feed(loc):
+ # Kolhapur has two known CPCB stations in WAQI. Prefer the direct station
+ # endpoint so a city-center coordinate or geocoder change cannot break live data.
+ station_ids=WAQI_STATIONS.get(str(loc.get("id") or "").lower(),[])
+ if station_ids:
+  last=None
+  for station_id in station_ids:
+   try:
+    return _waqi_json(f"/feed/{station_id}/")
+   except Exception as exc:
+    last=exc; logger.warning("WAQI station %s failed for %s: %s",station_id,loc.get("name"),exc)
+  if last is not None: logger.warning("All direct WAQI stations failed for %s; continuing with geo fallback",loc.get("name"))
  try:
   return _waqi_json(f"/feed/geo:{loc['lat']};{loc['lon']}/")
  except Exception as geo_exc:
