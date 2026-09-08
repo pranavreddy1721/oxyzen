@@ -60,9 +60,6 @@ def _has_usable_aqi(data):
   return False
 
 def _waqi_feed(loc):
- # A WAQI feed can return successfully while its AQI is "-" when the station
- # has no current AQI. Never treat that as a valid live snapshot; try another
- # station/feed instead.
  station_ids=WAQI_STATIONS.get(str(loc.get("id") or "").lower(),[])
  for station_id in station_ids:
   try:
@@ -115,8 +112,11 @@ def _source(data):
 def current_snapshot(loc):
  data=_waqi_feed(loc); raw=data.get("aqi")
  if raw is None or not str(raw).strip().lstrip("-").isdigit():raise RuntimeError("WAQI returned no usable AQI for this location")
- aqi=max(0,min(500,int(raw))); sub=_subindices(data); cat=category_for_aqi(aqi); city=data.get("city") or {}; geo=city.get("geo") or [loc["lat"],loc["lon"]]; provider_updated=((data.get("time") or {}).get("iso") or (data.get("time") or {}).get("s")); updated=provider_updated or datetime.now(timezone.utc).isoformat()
- return {"location":{"id":loc["id"],"name":city.get("name") or loc["name"],"country":loc.get("country","") ,"lat":float(geo[0]),"lon":float(geo[1])},"aqi":aqi,"category":cat["label"],"categoryKey":cat["key"],"color":cat["color"],"dominantPollutant":data.get("dominentpol"),"pollutants":sub,"pollutantSubIndices":sub,"updatedAt":updated,"providerUpdatedAt":provider_updated,"source":_source(data)}
+ aqi=max(0,min(500,int(raw))); sub=_subindices(data); cat=category_for_aqi(aqi); provider_updated=((data.get("time") or {}).get("iso") or (data.get("time") or {}).get("s")); updated=provider_updated or datetime.now(timezone.utc).isoformat()
+ # Keep the UI anchored to the location the user actually selected. The WAQI
+ # station is shown separately as the source, so a nearby station's display
+ # name/coordinates can never silently replace the selected city.
+ return {"location":{"id":loc["id"],"name":loc["name"],"country":loc.get("country","") ,"lat":float(loc["lat"]),"lon":float(loc["lon"])},"aqi":aqi,"category":cat["label"],"categoryKey":cat["key"],"color":cat["color"],"dominantPollutant":data.get("dominentpol"),"pollutants":sub,"pollutantSubIndices":sub,"updatedAt":updated,"providerUpdatedAt":provider_updated,"source":_source(data)}
 
 def history(loc,kind="24h"): return []
 
