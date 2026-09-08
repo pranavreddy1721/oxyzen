@@ -107,12 +107,22 @@ export default function Home() {
             <div className="rounded-xl border border-border bg-card p-6">
               <p className="mb-4 text-xs font-semibold uppercase tracking-widest text-muted-foreground">Key pollutants</p>
               <div className="space-y-3">
-                {["pm25", "pm10", "o3"].map((k) => (
-                  <div key={k} className="flex items-center justify-between">
-                    <span className="text-sm font-medium">{preview.pollutantMeta[k].name}</span>
-                    <span className="font-data text-sm">{preview.pollutants[k]} <span className="text-xs text-muted-foreground">{preview.pollutantMeta[k].unit}</span></span>
-                  </div>
-                ))}
+                {["pm25", "pm10", "o3"].map((k) => {
+                  const meta = preview.pollutantMeta?.[k];
+                  const value = preview.pollutants?.[k];
+
+                  if (!meta) return null;
+
+                  return (
+                    <div key={k} className="flex items-center justify-between">
+                      <span className="text-sm font-medium">{meta.name}</span>
+                      <span className="font-data text-sm">
+                        {value ?? "—"}{" "}
+                        <span className="text-xs text-muted-foreground">{meta.unit}</span>
+                      </span>
+                    </div>
+                  );
+                })}
               </div>
             </div>
             <div className="rounded-xl border border-border bg-card p-6">
