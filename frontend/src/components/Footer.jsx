@@ -43,7 +43,7 @@ export default function Footer() {
         </div>
         <div className="mt-10 flex flex-col items-start justify-between gap-3 border-t border-border pt-6 text-xs text-muted-foreground sm:flex-row sm:items-center">
           <p>© {new Date().getFullYear()} OxyZen · Air Quality Intelligence Platform</p>
-          <p className="font-data">Simulated environmental data · v1.0</p>
+          <p className="font-data">Live AQI data via World Air Quality Index (WAQI) · v1.0</p>
         </div>
       </div>
     </footer>
