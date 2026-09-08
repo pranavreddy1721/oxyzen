@@ -7,7 +7,7 @@ WAQI_BASE="https://api.waqi.info"; GEOCODING_URL="https://geocoding-api.open-met
 _EXTERNAL_LOCATIONS={}; _GEOCODE_CACHE={}; _GEOCODE_CACHE_TTL=600
 CITIES=[
 {"id":"delhi","name":"Delhi","country":"India","lat":28.6139,"lon":77.2090},{"id":"mumbai","name":"Mumbai","country":"India","lat":19.076,"lon":72.8777},{"id":"kolhapur","name":"Kolhapur","country":"India","lat":16.705,"lon":74.2433},{"id":"pune","name":"Pune","country":"India","lat":18.5204,"lon":73.8567},{"id":"bengaluru","name":"Bengaluru","country":"India","lat":12.9716,"lon":77.5946},{"id":"kolkata","name":"Kolkata","country":"India","lat":22.5726,"lon":88.3639},{"id":"beijing","name":"Beijing","country":"China","lat":39.9042,"lon":116.4074},{"id":"shanghai","name":"Shanghai","country":"China","lat":31.2304,"lon":121.4737},{"id":"lahore","name":"Lahore","country":"Pakistan","lat":31.5204,"lon":74.3587},{"id":"dhaka","name":"Dhaka","country":"Bangladesh","lat":23.8103,"lon":90.4125},{"id":"london","name":"London","country":"United Kingdom","lat":51.5074,"lon":-0.1278},{"id":"paris","name":"Paris","country":"France","lat":48.8566,"lon":2.3522},{"id":"newyork","name":"New York","country":"United States","lat":40.7128,"lon":-74.006},{"id":"losangeles","name":"Los Angeles","country":"United States","lat":34.0522,"lon":-118.2437},{"id":"tokyo","name":"Tokyo","country":"Japan","lat":35.6762,"lon":139.6503},{"id":"seoul","name":"Seoul","country":"South Korea","lat":37.5665,"lon":126.978},{"id":"sydney","name":"Sydney","country":"Australia","lat":-33.8688,"lon":151.2093},{"id":"zurich","name":"Zurich","country":"Switzerland","lat":47.3769,"lon":8.5417},{"id":"cairo","name":"Cairo","country":"Egypt","lat":30.0444,"lon":31.2357},{"id":"saopaulo","name":"São Paulo","country":"Brazil","lat":-23.5505,"lon":-46.6333},{"id":"mexicocity","name":"Mexico City","country":"Mexico","lat":19.4326,"lon":-99.1332},{"id":"dubai","name":"Dubai","country":"UAE","lat":25.2048,"lon":55.2708},{"id":"singapore","name":"Singapore","country":"Singapore","lat":1.3521,"lon":103.8198},{"id":"reykjavik","name":"Reykjavik","country":"Iceland","lat":64.1466,"lon":-21.9426}]
-POLLUTANT_META={k:{"key":k,"name":n,"unit":"AQI sub-index","reference":100,"full_name":full,"short":f"WAQI pollutant AQI sub-index for {full.lower()}.","what":"This value is a WAQI pollutant AQI sub-index, not a concentration measurement.","sources":[],"effects":[],"precautions":[]} for k,n,full in [("pm25","PM2.5","fine particulate matter"),("pm10","PM10","coarse particulate matter"),("o3","O₃","ground-level ozone"),("no2","NO₂","nitrogen dioxide"),("so2","SO₂","sulfur dioxide"),("co","CO","carbon monoxide")]}
+POLLUTANT_META={k:{"key":k,"name":n,"unit":"AQI sub-index","reference":100,"full_name":full,"short":f"WAQI pollutant AQI sub-index for {full.lower()}.","what":"This value is a WAQI pollutant AQI sub-index, not a concentration measurement.","sources":[],"effects":[],"precautions":[]} for k,n,full in [("pm25","PM2.5","fine particulate matter"),("pm10","PM10","coarse particulate matter"),("o3","O₃","ground-level ozone"),("no2","NO₂","nitrogen dioxide"),("so2","SO₂","sulfur dioxide"),("co","CO","carbon monoxide")]} 
 AQI_CATEGORIES=[{"min":0,"max":50,"label":"Good","key":"good","color":"#10B981"},{"min":51,"max":100,"label":"Moderate","key":"moderate","color":"#F59E0B"},{"min":101,"max":150,"label":"Unhealthy for Sensitive Groups","key":"sensitive","color":"#F97316"},{"min":151,"max":200,"label":"Unhealthy","key":"unhealthy","color":"#EF4444"},{"min":201,"max":300,"label":"Very Unhealthy","key":"veryUnhealthy","color":"#9333EA"},{"min":301,"max":500,"label":"Hazardous","key":"hazardous","color":"#9F1239"}]
 
 def category_for_aqi(aqi):
@@ -63,8 +63,8 @@ def _source(data):
 def current_snapshot(loc):
  data=_waqi_feed(loc); raw=data.get("aqi")
  if raw is None or not str(raw).lstrip("-").isdigit():raise RuntimeError("WAQI returned no usable AQI for this location")
- aqi=max(0,min(500,int(raw))); sub=_subindices(data); cat=category_for_aqi(aqi); city=data.get("city") or {}; geo=city.get("geo") or [loc["lat"],loc["lon"]]
- return {"location":{"id":loc["id"],"name":city.get("name") or loc["name"],"country":loc.get("country","") ,"lat":float(geo[0]),"lon":float(geo[1])},"aqi":aqi,"category":cat["label"],"categoryKey":cat["key"],"color":cat["color"],"dominantPollutant":data.get("dominentpol"),"pollutants":sub,"pollutantSubIndices":sub,"updatedAt":datetime.now(timezone.utc).isoformat(),"providerUpdatedAt":((data.get("time") or {}).get("iso") or (data.get("time") or {}).get("s")),"source":_source(data)}
+ aqi=max(0,min(500,int(raw))); sub=_subindices(data); cat=category_for_aqi(aqi); city=data.get("city") or {}; geo=city.get("geo") or [loc["lat"],loc["lon"]]; provider_updated=((data.get("time") or {}).get("iso") or (data.get("time") or {}).get("s")); updated=provider_updated or datetime.now(timezone.utc).isoformat()
+ return {"location":{"id":loc["id"],"name":city.get("name") or loc["name"],"country":loc.get("country","") ,"lat":float(geo[0]),"lon":float(geo[1])},"aqi":aqi,"category":cat["label"],"categoryKey":cat["key"],"color":cat["color"],"dominantPollutant":data.get("dominentpol"),"pollutants":sub,"pollutantSubIndices":sub,"updatedAt":updated,"providerUpdatedAt":provider_updated,"source":_source(data)}
 
 def history(loc,kind="24h"): return []
 
@@ -74,8 +74,7 @@ def forecast(loc,days=5):
   for pollutant,items in daily.items():
    if pollutant not in POLLUTANT_META:continue
    for item in items or []:
-    day=item.get("day")
-    avg=item.get("avg")
+    day=item.get("day"); avg=item.get("avg")
     if day is not None and isinstance(avg,(int,float)):dates.setdefault(day,[]).append(float(avg))
   rows=[]
   for day,vals in sorted(dates.items())[:max(1,min(7,int(days)))]:
