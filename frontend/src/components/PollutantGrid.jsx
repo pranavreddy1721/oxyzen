@@ -30,7 +30,7 @@ export default function PollutantGrid({ pollutants, meta, location }) {
     setLoading(true);
     try {
       const { data } = await api.get(`/aqi/pollutant/${key}`, {
-        params: { locationId: location?.id, lat: location?.lat, lon: location?.lon },
+        params: { locationId: location?.id, lat: location?.lat, lon: location?.lon, locationName: location?.name, locationCountry: location?.country },
       });
       setDetail(data);
     } catch {

@@ -44,3 +44,6 @@ Create a database named `oxyzen`. The application creates its collections and in
 ## Important
 
 Do not put MongoDB credentials, JWT secrets, or the Emergent key into the React frontend. They belong only in backend environment variables or Cloudflare Worker secrets.
+## Global city search
+
+OxyZen now uses the Open-Meteo Geocoding API server-side for location search. The existing curated catalogue remains the fast first source, while global geocoding results are merged and cached for 10 minutes. No frontend API key is required. The AQI engine still uses OxyZen's deterministic AQI model for the selected coordinates.

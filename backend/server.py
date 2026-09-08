@@ -215,7 +215,8 @@ async def update_alerts(body: AlertPrefInput, user: dict = Depends(get_current_u
 @api.get("/location/search")
 async def location_search(q: str = "", limit: int = 8):
     results = aqi_data.search_locations(q, limit)
-    return {"results": [{k: c[k] for k in ("id", "name", "country", "lat", "lon")} for c in results]}
+    fields = ("id", "name", "country", "admin1", "lat", "lon")
+    return {"results": [{k: c.get(k, "") for k in fields} for c in results]}
 
 
 @api.get("/location/reverse")
@@ -230,7 +231,7 @@ async def location_reverse(lat: float, lon: float):
 # ---------------------------------------------------------------------------
 # AQI routes
 # ---------------------------------------------------------------------------
-def _resolve_location(location_id: str, lat: Optional[float], lon: Optional[float]) -> dict:
+def _resolve_location(location_id: str, lat: Optional[float], lon: Optional[float], location_name: str = "", location_country: str = "") -> dict:
     if location_id:
         loc = aqi_data.find_by_id(location_id)
         if loc:
@@ -238,7 +239,9 @@ def _resolve_location(location_id: str, lat: Optional[float], lon: Optional[floa
     if lat is not None and lon is not None:
         near = aqi_data.nearest_location(lat, lon)
         dist2 = (near["lat"] - lat) ** 2 + (near["lon"] - lon) ** 2
-        return near if dist2 < 4.0 else aqi_data.make_custom_location(lat, lon)
+        if dist2 < 4.0:
+            return near
+        return aqi_data.make_custom_location(lat, lon, location_name or None, location_country)
     raise HTTPException(status_code=400, detail="A location or coordinates are required.")
 
 
@@ -255,8 +258,8 @@ async def _log_history(loc: dict, snap: dict, user_id: Optional[str]):
 
 
 @api.get("/aqi/current")
-async def aqi_current(request: Request, locationId: str = "", lat: Optional[float] = None, lon: Optional[float] = None):
-    loc = _resolve_location(locationId, lat, lon)
+async def aqi_current(request: Request, locationId: str = "", lat: Optional[float] = None, lon: Optional[float] = None, locationName: str = "", locationCountry: str = ""):
+    loc = _resolve_location(locationId, lat, lon, locationName, locationCountry)
     snap = aqi_data.current_snapshot(loc)
     snap["scale"] = aqi_data.AQI_CATEGORIES
     snap["pollutantMeta"] = aqi_data.POLLUTANT_META
@@ -271,8 +274,8 @@ async def aqi_current(request: Request, locationId: str = "", lat: Optional[floa
 
 
 @api.get("/aqi/history")
-async def aqi_history(locationId: str = "", lat: Optional[float] = None, lon: Optional[float] = None, range: str = "24h"):
-    loc = _resolve_location(locationId, lat, lon)
+async def aqi_history(locationId: str = "", lat: Optional[float] = None, lon: Optional[float] = None, range: str = "24h", locationName: str = "", locationCountry: str = ""):
+    loc = _resolve_location(locationId, lat, lon, locationName, locationCountry)
     if range not in ("24h", "7d", "30d"):
         range = "24h"
     return {"range": range, "points": aqi_data.history(loc, range),
@@ -280,18 +283,18 @@ async def aqi_history(locationId: str = "", lat: Optional[float] = None, lon: Op
 
 
 @api.get("/aqi/forecast")
-async def aqi_forecast(locationId: str = "", lat: Optional[float] = None, lon: Optional[float] = None, days: int = 5):
-    loc = _resolve_location(locationId, lat, lon)
+async def aqi_forecast(locationId: str = "", lat: Optional[float] = None, lon: Optional[float] = None, days: int = 5, locationName: str = "", locationCountry: str = ""):
+    loc = _resolve_location(locationId, lat, lon, locationName, locationCountry)
     days = max(2, min(7, days))
     return {"forecast": aqi_data.forecast(loc, days),
             "location": {k: loc[k] for k in ("id", "name", "country")}}
 
 
 @api.get("/aqi/pollutant/{pollutant}")
-async def pollutant_detail(pollutant: str, locationId: str = "", lat: Optional[float] = None, lon: Optional[float] = None):
+async def pollutant_detail(pollutant: str, locationId: str = "", lat: Optional[float] = None, lon: Optional[float] = None, locationName: str = "", locationCountry: str = ""):
     if pollutant not in aqi_data.POLLUTANT_META:
         raise HTTPException(status_code=404, detail="Unknown pollutant")
-    loc = _resolve_location(locationId, lat, lon)
+    loc = _resolve_location(locationId, lat, lon, locationName, locationCountry)
     snap = aqi_data.current_snapshot(loc)
     hist = aqi_data.history(loc, "24h")
     meta = aqi_data.POLLUTANT_META[pollutant]
@@ -318,8 +321,8 @@ async def pollutant_detail(pollutant: str, locationId: str = "", lat: Optional[f
 # Health risk routes
 # ---------------------------------------------------------------------------
 @api.get("/health-risk")
-async def get_health_risk(request: Request, locationId: str = "", lat: Optional[float] = None, lon: Optional[float] = None):
-    loc = _resolve_location(locationId, lat, lon)
+async def get_health_risk(request: Request, locationId: str = "", lat: Optional[float] = None, lon: Optional[float] = None, locationName: str = "", locationCountry: str = ""):
+    loc = _resolve_location(locationId, lat, lon, locationName, locationCountry)
     snap = aqi_data.current_snapshot(loc)
     result = health_risk.assess(snap["aqi"], snap["pollutants"])
     result["location"] = {k: loc[k] for k in ("id", "name", "country")}

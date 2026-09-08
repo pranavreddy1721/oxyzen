@@ -36,7 +36,7 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    const p = { params: { locationId: location.id, lat: location.lat, lon: location.lon } };
+    const p = { params: { locationId: location.id, lat: location.lat, lon: location.lon, locationName: location.name, locationCountry: location.country } };
     api.get("/aqi/current", p).then(({ data }) => setPreview(data)).catch(() => setPreview(null));
     api.get("/aqi/history", { params: { ...p.params, range: "7d" } }).then(({ data }) => setHistory(data.points)).catch(() => {});
   }, [location]);

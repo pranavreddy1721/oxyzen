@@ -30,7 +30,7 @@ export default function AQIMonitor() {
   const load = useCallback(async () => {
     setError(false);
     setCurrent(null);
-    const params = { locationId: location.id, lat: location.lat, lon: location.lon };
+    const params = { locationId: location.id, lat: location.lat, lon: location.lon, locationName: location.name, locationCountry: location.country };
     try {
       const [cur, rk, fc, hist] = await Promise.all([
         api.get("/aqi/current", { params }),

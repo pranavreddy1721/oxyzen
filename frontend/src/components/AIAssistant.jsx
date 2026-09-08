@@ -32,7 +32,7 @@ export default function AIAssistant() {
     if (!open) return;
     (async () => {
       try {
-        const { data } = await api.get("/aqi/current", { params: { locationId: location.id, lat: location.lat, lon: location.lon } });
+        const { data } = await api.get("/aqi/current", { params: { locationId: location.id, lat: location.lat, lon: location.lon, locationName: location.name, locationCountry: location.country } });
         setCtx({ name: data.location.name, aqi: data.aqi, category: data.category, dominantPollutant: data.dominantPollutant });
       } catch { setCtx(null); }
     })();

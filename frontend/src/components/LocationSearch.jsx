@@ -96,7 +96,7 @@ export default function LocationSearch({ onSelect, size = "default", showLocate 
               >
                 <MapPin className="h-4 w-4 shrink-0 text-primary" strokeWidth={1.5} />
                 <span className="text-sm font-medium">{r.name}</span>
-                {r.country && <span className="text-xs text-muted-foreground">{r.country}</span>}
+                {(r.admin1 || r.country) && <span className="text-xs text-muted-foreground">{[r.admin1, r.country].filter(Boolean).join(", ")}</span>}
               </button>
             ))}
           </div>

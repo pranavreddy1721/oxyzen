@@ -6,7 +6,11 @@ isolated so a real provider (e.g. OpenWeather) can replace it without touching r
 """
 import hashlib
 import math
+import logging
+import time
 from datetime import datetime, timezone, timedelta
+
+import requests
 
 # ---------------------------------------------------------------------------
 # Static reference data
@@ -179,25 +183,105 @@ def _diurnal_factor(hour: int) -> float:
 # Location helpers
 # ---------------------------------------------------------------------------
 
+logger = logging.getLogger("oxyzen.aqi_data")
+GEOCODING_URL = "https://geocoding-api.open-meteo.com/v1/search"
+_GEOCODE_CACHE = {}
+_GEOCODE_CACHE_TTL = 600  # 10 minutes
+_EXTERNAL_LOCATIONS = {}
+
+
+def _location_id_from_geocoder(item: dict) -> str:
+    return f"geo_{item.get('id')}"
+
+
+def _external_location(item: dict) -> dict:
+    loc = {
+        "id": _location_id_from_geocoder(item),
+        "name": item.get("name") or "Unknown location",
+        "country": item.get("country") or "",
+        "admin1": item.get("admin1") or "",
+        "lat": float(item["latitude"]),
+        "lon": float(item["longitude"]),
+        # Deterministic baseline keeps OxyZen's existing simulated AQI engine stable.
+        "base": 0.25 + _hash_float(round(float(item["latitude"]), 1), round(float(item["longitude"]), 1)) * 0.6,
+    }
+    _EXTERNAL_LOCATIONS[loc["id"]] = loc
+    return loc
+
+
+def _search_open_meteo(q: str, limit: int) -> list:
+    """Search the global Open-Meteo geocoding catalogue.
+
+    Open-Meteo supports global place-name search and returns WGS84 coordinates,
+    country and administrative-area information without requiring an API key for
+    normal non-commercial use. Results are cached briefly to avoid repeated calls
+    while the user types.
+    """
+    normalized = q.strip().lower()
+    if len(normalized) < 2:
+        return []
+
+    now = time.monotonic()
+    cached = _GEOCODE_CACHE.get(normalized)
+    if cached and now - cached[0] < _GEOCODE_CACHE_TTL:
+        return cached[1][:limit]
+
+    try:
+        response = requests.get(
+            GEOCODING_URL,
+            params={"name": q.strip(), "count": min(max(limit, 1), 20), "language": "en", "format": "json"},
+            timeout=4,
+        )
+        response.raise_for_status()
+        payload = response.json()
+        results = [_external_location(item) for item in (payload.get("results") or [])]
+        _GEOCODE_CACHE[normalized] = (now, results)
+        return results[:limit]
+    except (requests.RequestException, ValueError, KeyError, TypeError) as exc:
+        logger.warning("Global location search failed for %r: %s", q, exc)
+        return []
+
+
+def _same_location(a: dict, b: dict) -> bool:
+    return (
+        a.get("name", "").strip().lower() == b.get("name", "").strip().lower()
+        and a.get("country", "").strip().lower() == b.get("country", "").strip().lower()
+    ) or (
+        abs(float(a.get("lat", 0)) - float(b.get("lat", 0))) < 0.01
+        and abs(float(a.get("lon", 0)) - float(b.get("lon", 0))) < 0.01
+    )
+
+
 def search_locations(q: str, limit: int = 8):
-    q = (q or "").strip().lower()
+    q = (q or "").strip()
+    limit = min(max(int(limit or 8), 1), 20)
     if not q:
         return CITIES[:limit]
-    scored = []
+
+    # Keep the original curated catalogue fast, then enrich it with global results.
+    local = []
+    needle = q.lower()
     for c in CITIES:
         hay = f"{c['name']} {c['country']}".lower()
-        if q in hay:
-            score = 0 if hay.startswith(q) or c["name"].lower().startswith(q) else 1
-            scored.append((score, c))
-    scored.sort(key=lambda x: x[0])
-    return [c for _, c in scored[:limit]]
+        if needle in hay:
+            score = 0 if hay.startswith(needle) or c["name"].lower().startswith(needle) else 1
+            local.append((score, c))
+    local.sort(key=lambda x: x[0])
+
+    merged = [c for _, c in local]
+    for external in _search_open_meteo(q, limit):
+        if not any(_same_location(external, existing) for existing in merged):
+            merged.append(external)
+        if len(merged) >= limit:
+            break
+    return merged[:limit]
 
 
 def find_by_id(loc_id: str):
     for c in CITIES:
         if c["id"] == loc_id:
             return c
-    return None
+    return _EXTERNAL_LOCATIONS.get(loc_id)
 
 
 def nearest_location(lat: float, lon: float):
@@ -209,13 +293,13 @@ def nearest_location(lat: float, lon: float):
     return best
 
 
-def make_custom_location(lat: float, lon: float, name: str = None):
+def make_custom_location(lat: float, lon: float, name: str = None, country: str = ""):
     """Build a location dict for arbitrary coordinates (used for geolocation)."""
     base = 0.25 + _hash_float(round(lat, 1), round(lon, 1)) * 0.6
     return {
         "id": f"coord_{round(lat,3)}_{round(lon,3)}",
         "name": name or f"{round(lat,3)}, {round(lon,3)}",
-        "country": "",
+        "country": country or "",
         "lat": lat, "lon": lon, "base": base,
     }
 

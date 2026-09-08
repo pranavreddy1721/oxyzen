@@ -28,7 +28,7 @@ export default function History() {
   const load = useCallback(async () => {
     setError(false); setPoints(null);
     try {
-      const { data } = await api.get("/aqi/history", { params: { locationId: location.id, lat: location.lat, lon: location.lon, range } });
+      const { data } = await api.get("/aqi/history", { params: { locationId: location.id, lat: location.lat, lon: location.lon, locationName: location.name, locationCountry: location.country, range } });
       setPoints(data.points);
     } catch { setError(true); }
   }, [location, range]);
