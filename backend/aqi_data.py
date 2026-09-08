@@ -51,43 +51,54 @@ def _waqi_json(path,params=None):
  if payload.get("status")!="ok":raise RuntimeError(str(payload.get("data") or "WAQI request failed"))
  return payload.get("data") or {}
 
-def _waqi_feed(loc):
- # Kolhapur has two known CPCB stations in WAQI. Prefer the direct station
- # endpoint so a city-center coordinate or geocoder change cannot break live data.
- station_ids=WAQI_STATIONS.get(str(loc.get("id") or "").lower(),[])
- if station_ids:
-  last=None
-  for station_id in station_ids:
-   try:
-    return _waqi_json(f"/feed/{station_id}/")
-   except Exception as exc:
-    last=exc; logger.warning("WAQI station %s failed for %s: %s",station_id,loc.get("name"),exc)
-  if last is not None: logger.warning("All direct WAQI stations failed for %s; continuing with geo fallback",loc.get("name"))
+def _has_usable_aqi(data):
+ raw=(data or {}).get("aqi")
  try:
-  return _waqi_json(f"/feed/geo:{loc['lat']};{loc['lon']}/")
- except Exception as geo_exc:
-  logger.warning("WAQI geo feed failed for %s: %s; trying nearby station fallback", loc.get("name"), geo_exc)
+  int(str(raw).strip())
+  return True
+ except (TypeError,ValueError):
+  return False
+
+def _waqi_feed(loc):
+ # A WAQI feed can return successfully while its AQI is "-" when the station
+ # has no current AQI. Never treat that as a valid live snapshot; try another
+ # station/feed instead.
+ station_ids=WAQI_STATIONS.get(str(loc.get("id") or "").lower(),[])
+ for station_id in station_ids:
   try:
-   lat=float(loc["lat"]); lon=float(loc["lon"])
-   bounds=f"{lat-0.5},{lon-0.5},{lat+0.5},{lon+0.5}"
-   stations=_waqi_json("/map/bounds/", {"latlng":bounds})
+   data=_waqi_json(f"/feed/{station_id}/")
+   if _has_usable_aqi(data): return data
+   logger.warning("WAQI station %s has no current AQI for %s; trying next source",station_id,loc.get("name"))
+  except Exception as exc:
+   logger.warning("WAQI station %s failed for %s: %s",station_id,loc.get("name"),exc)
+ try:
+  data=_waqi_json(f"/feed/geo:{loc['lat']};{loc['lon']}/")
+  if _has_usable_aqi(data): return data
+  raise RuntimeError("WAQI geo feed returned no current AQI")
+ except Exception as geo_exc:
+  logger.warning("WAQI geo feed failed for %s: %s; trying nearby station fallback",loc.get("name"),geo_exc)
+  try:
+   lat=float(loc["lat"]); lon=float(loc["lon"]); bounds=f"{lat-0.5},{lon-0.5},{lat+0.5},{lon+0.5}"
+   stations=_waqi_json("/map/bounds/",{"latlng":bounds})
    candidates=[]
    for station in stations if isinstance(stations,list) else []:
     try:
      slat=float(station.get("lat")); slon=float(station.get("lon")); uid=station.get("uid")
      if uid is not None:candidates.append((abs(slat-lat)+abs(slon-lon),uid))
-    except (TypeError,ValueError):
-     continue
-   if candidates:
-    _,uid=min(candidates,key=lambda item:item[0])
-    return _waqi_json(f"/feed/@{uid}/")
+    except (TypeError,ValueError):continue
+   for _,uid in sorted(candidates,key=lambda item:item[0]):
+    try:
+     data=_waqi_json(f"/feed/@{uid}/")
+     if _has_usable_aqi(data):return data
+    except Exception as exc:logger.warning("WAQI nearby station %s failed: %s",uid,exc)
   except Exception as nearby_exc:
-   logger.warning("WAQI nearby station fallback failed for %s: %s", loc.get("name"), nearby_exc)
+   logger.warning("WAQI nearby station fallback failed for %s: %s",loc.get("name"),nearby_exc)
   try:
    name=(loc.get("name") or "").strip()
-   if name:return _waqi_json(f"/feed/{name}/")
-  except Exception as city_exc:
-   logger.warning("WAQI city fallback failed for %s: %s", loc.get("name"), city_exc)
+   if name:
+    data=_waqi_json(f"/feed/{name}/")
+    if _has_usable_aqi(data):return data
+  except Exception as city_exc:logger.warning("WAQI city fallback failed for %s: %s",loc.get("name"),city_exc)
   raise geo_exc
 
 def _subindices(data):
@@ -103,7 +114,7 @@ def _source(data):
 
 def current_snapshot(loc):
  data=_waqi_feed(loc); raw=data.get("aqi")
- if raw is None or not str(raw).lstrip("-").isdigit():raise RuntimeError("WAQI returned no usable AQI for this location")
+ if raw is None or not str(raw).strip().lstrip("-").isdigit():raise RuntimeError("WAQI returned no usable AQI for this location")
  aqi=max(0,min(500,int(raw))); sub=_subindices(data); cat=category_for_aqi(aqi); city=data.get("city") or {}; geo=city.get("geo") or [loc["lat"],loc["lon"]]; provider_updated=((data.get("time") or {}).get("iso") or (data.get("time") or {}).get("s")); updated=provider_updated or datetime.now(timezone.utc).isoformat()
  return {"location":{"id":loc["id"],"name":city.get("name") or loc["name"],"country":loc.get("country","") ,"lat":float(geo[0]),"lon":float(geo[1])},"aqi":aqi,"category":cat["label"],"categoryKey":cat["key"],"color":cat["color"],"dominantPollutant":data.get("dominentpol"),"pollutants":sub,"pollutantSubIndices":sub,"updatedAt":updated,"providerUpdatedAt":provider_updated,"source":_source(data)}
 
