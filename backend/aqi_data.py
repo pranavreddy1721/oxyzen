@@ -48,7 +48,34 @@ def _waqi_json(path,params=None):
  if payload.get("status")!="ok":raise RuntimeError(str(payload.get("data") or "WAQI request failed"))
  return payload.get("data") or {}
 
-def _waqi_feed(loc): return _waqi_json(f"/feed/geo:{loc['lat']};{loc['lon']}/")
+def _waqi_feed(loc):
+ try:
+  return _waqi_json(f"/feed/geo:{loc['lat']};{loc['lon']}/")
+ except Exception as geo_exc:
+  logger.warning("WAQI geo feed failed for %s: %s; trying nearby station fallback", loc.get("name"), geo_exc)
+  try:
+   lat=float(loc["lat"]); lon=float(loc["lon"])
+   bounds=f"{lat-0.5},{lon-0.5},{lat+0.5},{lon+0.5}"
+   stations=_waqi_json("/map/bounds/", {"latlng":bounds})
+   candidates=[]
+   for station in stations if isinstance(stations,list) else []:
+    try:
+     slat=float(station.get("lat")); slon=float(station.get("lon")); uid=station.get("uid")
+     if uid is not None:candidates.append((abs(slat-lat)+abs(slon-lon),uid))
+    except (TypeError,ValueError):
+     continue
+   if candidates:
+    _,uid=min(candidates,key=lambda item:item[0])
+    return _waqi_json(f"/feed/@{uid}/")
+  except Exception as nearby_exc:
+   logger.warning("WAQI nearby station fallback failed for %s: %s", loc.get("name"), nearby_exc)
+  try:
+   name=(loc.get("name") or "").strip()
+   if name:return _waqi_json(f"/feed/{name}/")
+  except Exception as city_exc:
+   logger.warning("WAQI city fallback failed for %s: %s", loc.get("name"), city_exc)
+  raise geo_exc
+
 def _subindices(data):
  iaqi=data.get("iaqi") or {}; out={}
  for k in POLLUTANT_META:
