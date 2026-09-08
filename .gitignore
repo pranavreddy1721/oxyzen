@@ -5,3 +5,10 @@ frontend/build/
 .env.*
 !.env.example
 backend/.env
+# Python/cache/local secrets
+__pycache__/
+*.py[cod]
+*.pyo
+.env
+.env.*
+!.env.example
