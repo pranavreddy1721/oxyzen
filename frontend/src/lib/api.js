@@ -2,7 +2,7 @@ import axios from "axios";
 
 // Cloudflare Worker proxies /api/* to the FastAPI backend.
 // Keeping this relative makes the deployed app same-origin and avoids CORS issues.
-export const API = "/api";
+export const API = "https://oxyzen-backend-5nvw.onrender.com/api";
 
 const api = axios.create({ baseURL: API, withCredentials: true });
 
