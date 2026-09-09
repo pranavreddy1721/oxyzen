@@ -68,7 +68,7 @@ def _known_station_ids(loc):
  return []
 def _resolve_feed(loc):
  for sid in _known_station_ids(loc):
-  result=_fetch_feed(loc,f"/feed/@{sid}/",enforce_distance=False)
+  result=_fetch_feed(loc,f"/feed/{sid}/",enforce_distance=False)
   if result:return result
  name=(loc.get("name") or "").strip()
  if name:
