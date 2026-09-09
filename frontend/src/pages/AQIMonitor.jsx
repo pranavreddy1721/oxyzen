@@ -4,7 +4,6 @@ import { toast } from "sonner";
 import api, { formatApiError } from "@/lib/api";
 import { useLocation } from "@/context/LocationContext";
 import { useAuth } from "@/context/AuthContext";
-import { aqiCategory } from "@/lib/aqiColors";
 import LocationSearch from "@/components/LocationSearch";
 import AQICard from "@/components/AQICard";
 import AQIScale from "@/components/AQIScale";
@@ -23,10 +22,12 @@ export default function AQIMonitor() {
   const [risk, setRisk] = useState(null);
   const [forecast, setForecast] = useState([]);
   const [error, setError] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
   const [saved, setSaved] = useState(false);
 
   const load = useCallback(async () => {
     setError(false);
+    setErrorMessage("");
     setCurrent(null);
     const params = { locationId: location.id, lat: location.lat, lon: location.lon, locationName: location.name, locationCountry: location.country };
     try {
@@ -39,6 +40,11 @@ export default function AQIMonitor() {
       setRisk(rk.data);
       setForecast(fc.data.forecast);
     } catch (e) {
+      const detail = e?.response?.data?.detail;
+      setErrorMessage(
+        detail ||
+        `Live WAQI data is currently unavailable for ${location.name}. There may be no nearby WAQI monitoring station available for this location.`
+      );
       setError(true);
     }
   }, [location]);
@@ -84,7 +90,7 @@ export default function AQIMonitor() {
       </div>
 
       {error ? (
-        <ErrorState onRetry={load} message="We couldn't load air-quality data for this location." />
+        <ErrorState onRetry={load} message={errorMessage || "We couldn't load air-quality data for this location."} />
       ) : !current ? (
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
           <div className="lg:col-span-4"><CardSkeleton className="h-80" /></div>
