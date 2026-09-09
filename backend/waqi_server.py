@@ -13,7 +13,7 @@ def _remove_route(path: str):
     ]
 
 
-for _path in ("/api/aqi/current", "/api/aqi/history", "/api/aqi/pollutant/{pollutant}", "/api/health-risk"):
+for _path in ("/api/aqi/current", "/api/aqi/pollutant/{pollutant}", "/api/health-risk"):
     _remove_route(_path)
 
 
@@ -58,33 +58,6 @@ async def aqi_current_waqi(
     snap["scale"] = server.aqi_data.AQI_CATEGORIES
     snap["pollutantMeta"] = server.aqi_data.POLLUTANT_META
     return snap
-
-
-@app.get("/api/aqi/history")
-async def aqi_history_waqi(
-    locationId: str = "",
-    lat: float | None = None,
-    lon: float | None = None,
-    range: str = "24h",
-    locationName: str = "",
-    locationCountry: str = "",
-):
-    loc = _loc(
-        locationId=locationId,
-        lat=lat,
-        lon=lon,
-        locationName=locationName,
-        locationCountry=locationCountry,
-    )
-    if range not in ("24h", "7d", "30d"):
-        range = "24h"
-    return {
-        "range": range,
-        "available": False,
-        "points": [],
-        "message": "Historical AQI data is unavailable from the live WAQI API.",
-        "location": {k: loc[k] for k in ("id", "name", "country")},
-    }
 
 
 @app.get("/api/aqi/pollutant/{pollutant}")
