@@ -11,7 +11,6 @@ import Home from "@/pages/Home";
 
 const AQIMonitor = lazy(() => import("@/pages/AQIMonitor"));
 const MapPage = lazy(() => import("@/pages/MapPage"));
-const History = lazy(() => import("@/pages/History"));
 const Masks = lazy(() => import("@/pages/Masks"));
 const AQIInfo = lazy(() => import("@/pages/AQIInfo"));
 const Tips = lazy(() => import("@/pages/Tips"));
@@ -31,7 +30,6 @@ function App() {
                   <Route path="/" element={<Home />} />
                   <Route path="/aqi-monitor" element={<AQIMonitor />} />
                   <Route path="/map" element={<MapPage />} />
-                  <Route path="/history" element={<History />} />
                   <Route path="/masks" element={<Masks />} />
                   <Route path="/aqi-info" element={<AQIInfo />} />
                   <Route path="/tips" element={<Tips />} />
