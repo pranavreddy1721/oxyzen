@@ -13,7 +13,6 @@ import HealthRiskCard from "@/components/HealthRiskCard";
 import ActivityGuidance from "@/components/ActivityGuidance";
 import ExposureContext from "@/components/ExposureContext";
 import ForecastPanel from "@/components/ForecastPanel";
-import AQIChart from "@/components/AQIChart";
 import { Button } from "@/components/ui/button";
 import { CardSkeleton, ErrorState } from "@/components/states";
 
@@ -23,7 +22,6 @@ export default function AQIMonitor() {
   const [current, setCurrent] = useState(null);
   const [risk, setRisk] = useState(null);
   const [forecast, setForecast] = useState([]);
-  const [history, setHistory] = useState([]);
   const [error, setError] = useState(false);
   const [saved, setSaved] = useState(false);
 
@@ -32,16 +30,14 @@ export default function AQIMonitor() {
     setCurrent(null);
     const params = { locationId: location.id, lat: location.lat, lon: location.lon, locationName: location.name, locationCountry: location.country };
     try {
-      const [cur, rk, fc, hist] = await Promise.all([
+      const [cur, rk, fc] = await Promise.all([
         api.get("/aqi/current", { params }),
         api.get("/health-risk", { params }),
         api.get("/aqi/forecast", { params: { ...params, days: 5 } }),
-        api.get("/aqi/history", { params: { ...params, range: "24h" } }),
       ]);
       setCurrent(cur.data);
       setRisk(rk.data);
       setForecast(fc.data.forecast);
-      setHistory(hist.data.points);
     } catch (e) {
       setError(true);
     }
@@ -69,8 +65,6 @@ export default function AQIMonitor() {
       toast.error(formatApiError(e.response?.data?.detail));
     }
   };
-
-  const cat = current ? aqiCategory(current.aqi) : null;
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
@@ -114,13 +108,6 @@ export default function AQIMonitor() {
           </div>
 
           <div className="lg:col-span-6"><ActivityGuidance activities={risk?.activityGuidance} aqi={current.aqi} /></div>
-          <div className="lg:col-span-6">
-            <div className="rounded-xl border border-border bg-card p-6">
-              <h3 className="mb-4 text-sm font-semibold uppercase tracking-widest text-muted-foreground">24-hour AQI</h3>
-              <AQIChart data={history} color={cat.color} height={200} />
-            </div>
-          </div>
-
           <div className="lg:col-span-12"><ExposureContext aqi={current.aqi} /></div>
           <div className="lg:col-span-12"><ForecastPanel forecast={forecast} /></div>
         </div>
