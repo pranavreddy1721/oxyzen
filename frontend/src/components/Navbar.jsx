@@ -8,7 +8,6 @@ import ThemeToggle from "@/components/ThemeToggle";
 const NAV = [
   { to: "/aqi-monitor", label: "AQI Monitor" },
   { to: "/map", label: "Map" },
-  { to: "/history", label: "History" },
   { to: "/aqi-info", label: "AQI Info" },
   { to: "/tips", label: "Health Tips" },
   { to: "/masks", label: "Masks" },
