@@ -2,37 +2,25 @@
 
 <img src="https://capsule-render.vercel.app/api?type=waving&color=10B981&height=210&section=header&text=OXYZEN&fontSize=64&fontColor=ffffff&fontAlignY=38&desc=Understand%20Your%20Air%20%E2%80%A2%20Understand%20Your%20Health&descAlignY=60&descSize=20&animation=fadeIn" width="100%" />
 
-<br/>
-
 <p>
   <img src="https://img.shields.io/badge/React-19-61DAFB?style=for-the-badge&logo=react&logoColor=black" />
   <img src="https://img.shields.io/badge/FastAPI-0.110.1-009688?style=for-the-badge&logo=fastapi&logoColor=white" />
   <img src="https://img.shields.io/badge/Python-3.11-3776AB?style=for-the-badge&logo=python&logoColor=white" />
   <img src="https://img.shields.io/badge/MongoDB-Atlas-47A248?style=for-the-badge&logo=mongodb&logoColor=white" />
+  <img src="https://img.shields.io/badge/WAQI-Live%20AQI-0B7285?style=for-the-badge" />
 </p>
 <p>
-  <img src="https://img.shields.io/badge/WAQI-Live%20AQI-0B7285?style=for-the-badge" />
   <img src="https://img.shields.io/badge/Leaflet-Maps-199900?style=for-the-badge&logo=leaflet&logoColor=white" />
   <img src="https://img.shields.io/badge/Recharts-Analytics-8884D8?style=for-the-badge" />
   <img src="https://img.shields.io/badge/Three.js-3D%20Globe-000000?style=for-the-badge&logo=threedotjs&logoColor=white" />
   <img src="https://img.shields.io/badge/JWT-Auth-000000?style=for-the-badge&logo=jsonwebtokens&logoColor=white" />
-</p>
-<p>
   <img src="https://img.shields.io/badge/Cloudflare-Pages-F38020?style=for-the-badge&logo=cloudflare&logoColor=white" />
   <img src="https://img.shields.io/badge/Render-Backend-46E3B7?style=for-the-badge&logo=render&logoColor=black" />
-  <img src="https://img.shields.io/badge/AI-Gemini-4285F4?style=for-the-badge&logo=google&logoColor=white" />
-  <img src="https://img.shields.io/badge/License-MIT-blue?style=for-the-badge" />
 </p>
-
-<br/>
 
 > **A full-stack air-quality intelligence platform that turns live pollution data into understandable AQI, pollutant insights, environmental health-risk scoring, exposure guidance, forecasts and actionable precautions.**
 
-<br/>
-
-[🚀 Live Demo](https://oxyzen1.pages.dev) &nbsp;•&nbsp; [📚 API Docs](https://oxyzen-backend-5nvw.onrender.com/docs) &nbsp;•&nbsp; [🐛 Report Bug](https://github.com/pranavreddy1721/oxyzen/issues) &nbsp;•&nbsp; [💡 Request Feature](https://github.com/pranavreddy1721/oxyzen/issues)
-
-<br/>
+[🚀 Live Demo](https://oxyzen1.pages.dev) &nbsp;•&nbsp; [📚 API Docs](https://oxyzen-backend-5nvw.onrender.com/docs) &nbsp;•&nbsp; [🐛 Issues](https://github.com/pranavreddy1721/oxyzen/issues)
 
 </div>
 
@@ -41,157 +29,158 @@
 ## 📋 Table of Contents
 
 - [✨ Overview](#-overview)
-- [🌍 What OXYZEN Does](#-what-oxyzen-does)
 - [🚀 Features](#-features)
+- [📡 Live AQI Data Pipeline](#-live-aqi-data-pipeline)
 - [📊 AQI & Risk Model](#-aqi--risk-model)
-- [🧩 System Architecture](#-system-architecture)
+- [🔌 API](#-api)
+- [🧩 Architecture](#-architecture)
 - [🛠️ Tech Stack](#️-tech-stack)
 - [🗂️ Project Structure](#️-project-structure)
-- [🔌 API Endpoints](#-api-endpoints)
-- [🔐 Authentication](#-authentication)
 - [⚙️ Environment Variables](#️-environment-variables)
 - [☁️ Deployment](#️-deployment)
 - [💻 Getting Started](#-getting-started)
-- [📱 Responsive Design](#-responsive-design)
-- [🔒 Security](#-security)
 - [⚠️ Data & Medical Disclaimer](#️-data--medical-disclaimer)
-- [🤝 Contributing](#-contributing)
 - [📄 License](#-license)
 
 ---
 
 ## ✨ Overview
 
-**OXYZEN** is a full-stack web application focused on making air-quality information easier to understand and act on.
+**OXYZEN** is a React + FastAPI application for monitoring and understanding current air quality. It combines live WAQI station observations with pollutant AQI sub-indices, an explainable environmental health-risk indicator, activity/exposure guidance, forecasts, maps, education and an AI assistant.
 
-Instead of presenting only a single AQI number, OXYZEN combines live air-quality observations with pollutant-level context, an explainable environmental health-risk score, activity guidance, exposure calculations, forecasts, educational resources and an AI assistant.
-
-The application is designed around four simple ideas:
+The application follows:
 
 ```text
 MONITOR  →  ANALYZE  →  PREDICT  →  PROTECT
 ```
 
-- **Monitor** — retrieve live AQI information for a selected location.
-- **Analyze** — break down available pollutant AQI sub-indices.
-- **Predict** — provide an explainable environmental health-risk indicator and available forecast information.
-- **Protect** — translate conditions into practical exposure and activity guidance.
-
----
-
-## 🌍 What OXYZEN Does
-
-<table>
-<tr>
-<td width="50%">
-
-### 🌐 Live Air Quality
-
-- Current AQI from **World Air Quality Index (WAQI)**
-- Selected-city aware location handling
-- WAQI station/source attribution
-- Six pollutant AQI sub-indices when available
-- US EPA-style AQI category presentation
-
-</td>
-<td width="50%">
-
-### 🗺️ Location Intelligence
-
-- Worldwide location search
-- Open-Meteo geocoding fallback
-- Latitude/longitude based lookup
-- Global live pollution map
-- Interactive 3D Earth visualization
-
-</td>
-</tr>
-<tr>
-<td width="50%">
-
-### 🧠 Explainable Health Risk
-
-- Environmental health-risk score from 0–100
-- Five risk bands: Low → Severe
-- Weighted AQI and pollutant contribution model
-- Main-contributor breakdown
-- Health-impact and precaution guidance
-
-</td>
-<td width="50%">
-
-### 🏃 Exposure & Activity
-
-- Outdoor/indoor exposure context
-- Activity intensity adjustment
-- Duration adjustment
-- Walking, running, cycling and outdoor-sport guidance
-- Practical exposure-reduction suggestions
-
-</td>
-</tr>
-<tr>
-<td width="50%">
-
-### 🔮 Forecasting
-
-- Available WAQI pollutant forecasts
-- Multi-day forecast cards
-- AQI category and trend presentation
-- Forecast values derived from available pollutant forecast sub-indices
-
-</td>
-<td width="50%">
-
-### 🤖 OxyZen AI
-
-- Context-aware air-quality assistant
-- Current location and AQI context
-- Streaming responses
-- Questions about pollutants, health impacts and precautions
-- Session-based chat handling
-
-</td>
-</tr>
-<tr>
-<td width="50%">
-
-### 👤 User Dashboard
-
-- Account registration and login
-- Saved locations
-- Recent searches
-- AQI alert threshold
-- Enable/disable alerts
-
-</td>
-<td width="50%">
-
-### 📚 Education
-
-- AQI fundamentals
-- Six major pollutants
-- Pollution and weather factors
-- Health tips
-- Mask and particulate-filtration information
-
-</td>
-</tr>
-</table>
+- **Monitor** — retrieve live AQI for a selected location.
+- **Analyze** — display available pollutant AQI sub-indices.
+- **Predict** — provide an environmental health-risk indicator and available forecast information.
+- **Protect** — translate current conditions into practical activity and exposure guidance.
 
 ---
 
 ## 🚀 Features
 
-### 📡 Real-Time AQI Pipeline
+### 🌐 Live Air Quality
 
-OXYZEN retrieves current air-quality observations through the WAQI API. The backend resolves the user's selected location, retrieves an appropriate WAQI feed, validates that a usable AQI is available and exposes the provider source separately from the selected UI location.
+- Live AQI from **World Air Quality Index (WAQI)**.
+- Location-aware station resolution.
+- WAQI monitoring station and originating agency attribution.
+- Six pollutant AQI sub-indices when available: PM2.5, PM10, O₃, NO₂, SO₂ and CO.
+- AQI category presentation on a 0–500 application scale.
+- Explicit indication when the selected city is represented by a nearby/associated monitoring station.
 
-For locations with known WAQI/CPCB station mappings, direct station feeds are preferred before geographic and nearby-station fallbacks.
+### 🗺️ Location Intelligence
 
-### 🧪 Six Pollutants
+- Curated city catalogue for common locations.
+- Server-side Open-Meteo geocoding fallback for broader location search.
+- Latitude/longitude lookup and reverse location handling.
+- Global WAQI map data.
+- Interactive Leaflet map and Three.js globe.
 
-| Pollutant | Key | OXYZEN Representation |
+### 🧠 Explainable Health Risk
+
+- 0–100 environmental health-risk awareness score.
+- Risk bands from Low to Severe.
+- AQI and pollutant contribution breakdown.
+- Health-impact context and practical precautions.
+
+### 🏃 Exposure & Activity
+
+- Outdoor/indoor exposure context.
+- Activity intensity and duration adjustment.
+- Guidance for walking, running, cycling and outdoor sports.
+
+### 🔮 Forecasting
+
+- WAQI pollutant forecast data when available.
+- Multi-day forecast presentation.
+- AQI category and trend display.
+
+### 👤 User Features
+
+- Registration, login and logout.
+- Saved locations.
+- Alert threshold preferences.
+- Dashboard-related records in MongoDB Atlas.
+
+### 🤖 OxyZen AI
+
+- Context-aware air-quality assistant.
+- Current AQI/location context.
+- Streaming chat responses through the configured LLM integration.
+
+---
+
+## 📡 Live AQI Data Pipeline
+
+OXYZEN uses **WAQI as the live air-quality provider**. The browser does not call WAQI directly; the FastAPI backend performs the provider request and returns a normalized application response.
+
+```text
+User selects location
+        │
+        ▼
+FastAPI /api/aqi/current
+        │
+        ▼
+Location resolution
+        │
+        ├── Known WAQI station mapping
+        ├── Named WAQI city feed
+        ├── WAQI geo query
+        └── WAQI map/station fallback
+        │
+        ▼
+WAQI station response
+        │
+        ▼
+Normalize AQI + pollutant sub-indices
+        │
+        ▼
+Attach station/source/distance metadata
+        │
+        ▼
+React AQI Monitor
+```
+
+### Station-aware resolution
+
+For locations with known station mappings, OXYZEN tries the mapped WAQI station before using geographic fallback logic. The backend also validates station distance for geographic/map fallbacks so an unrelated remote station is not silently presented as the selected city.
+
+For example, Sangli currently uses the WAQI-associated station **A568009 (Vijay Nagar, Sangli / Hanchinala)** when available. Because that station can be outside the exact city coordinates, the API returns distance and `matchType`/`dataType` metadata so the frontend can clearly identify it as a nearby/associated monitoring station rather than an exact city measurement.
+
+### AQI normalization and resilience
+
+The WAQI integration has an explicit normalization boundary:
+
+1. A numeric AQI is accepted whether WAQI returns it as an integer, float or numeric string such as `"23.0"`.
+2. The normalized value is rounded and constrained to the application's `0–500` presentation range.
+3. If the aggregate WAQI AQI is missing but pollutant AQI sub-indices are available, the backend can derive a fallback AQI from the highest available pollutant sub-index instead of failing the request.
+4. The derived case is marked internally so provider data and application fallback logic remain distinguishable.
+
+This prevents the earlier `int("23.0")` parsing failure from producing HTTP 500 responses.
+
+### Provider/source metadata
+
+Current AQI responses include source information such as:
+
+- Provider: **World Air Quality Index (WAQI)**
+- Monitoring station name
+- Originating/source agency when supplied by WAQI
+- Station coordinates
+- Distance from the selected location
+- Direct vs nearby/associated match type
+- Provider update timestamp
+
+The AQI card exposes this information under **Live Data Source**.
+
+### Pollutant data semantics
+
+OXYZEN currently represents the six pollutant values from WAQI as **pollutant AQI sub-indices**, not raw concentration measurements such as µg/m³.
+
+| Pollutant | Key | Representation |
 |---|---|---|
 | PM2.5 | `pm25` | WAQI AQI sub-index |
 | PM10 | `pm10` | WAQI AQI sub-index |
@@ -200,27 +189,11 @@ For locations with known WAQI/CPCB station mappings, direct station feeds are pr
 | Sulfur dioxide | `so2` | WAQI AQI sub-index |
 | Carbon monoxide | `co` | WAQI AQI sub-index |
 
-> **Important:** the pollutant values supplied by the current WAQI integration are pollutant **AQI sub-indices**, not raw concentration measurements such as µg/m³. OXYZEN keeps that distinction explicit in its UI and backend model.
-
-### 📈 Data Visualization
-
-OXYZEN uses responsive visual components rather than dumping raw API responses onto the page:
-
-- AQI category scale
-- AQI area-chart component where applicable
-- Pollutant comparison cards
-- Risk contribution visualization
-- Forecast cards with trend indicators
-- Global interactive map
-- Interactive 3D Earth/globe visualization
-
 ---
 
 ## 📊 AQI & Risk Model
 
 ### AQI Categories
-
-OXYZEN presents the following AQI bands:
 
 | AQI | Category |
 |---:|---|
@@ -231,27 +204,21 @@ OXYZEN presents the following AQI bands:
 | `201–300` | 🟣 Very Unhealthy |
 | `301–500` | 🟥 Hazardous |
 
-The current live AQI comes from WAQI and is clamped to the application's 0–500 presentation scale.
+The live AQI originates from WAQI. OXYZEN normalizes the provider value and clamps the displayed application value to `0–500`.
 
 ### Environmental Health-Risk Score
 
-The risk engine produces an **awareness indicator**, not a medical diagnosis.
-
-The model combines normalized current AQI and available pollutant sub-indices using weighted contributions:
+The risk engine is an **awareness indicator**, not a medical diagnosis. It combines current AQI and available pollutant AQI sub-indices using the application's configured weighted model.
 
 ```text
-Risk Score
-    │
-    ├── Overall AQI              24%
-    ├── PM2.5                     34%
-    ├── PM10                      14%
-    ├── O₃                         12%
-    ├── NO₂                         8%
-    ├── SO₂                         5%
-    └── CO                          3%
+Overall AQI   24%
+PM2.5         34%
+PM10          14%
+O₃            12%
+NO₂            8%
+SO₂            5%
+CO             3%
 ```
-
-Risk bands:
 
 | Score | Level |
 |---:|---|
@@ -261,11 +228,64 @@ Risk bands:
 | `61–80` | HIGH |
 | `81–100` | SEVERE |
 
-The application also produces activity guidance for walking, running, cycling and outdoor sports based on current AQI.
+---
+
+## 🔌 API
+
+Production API base URL:
+
+```text
+https://oxyzen-backend-5nvw.onrender.com/api
+```
+
+Interactive API documentation:
+
+```text
+https://oxyzen-backend-5nvw.onrender.com/docs
+```
+
+### Location
+
+| Method | Endpoint | Purpose |
+|---|---|---|
+| GET | `/api/location/search` | Search curated/global locations |
+| GET | `/api/location/reverse` | Resolve a location from latitude/longitude |
+
+### AQI
+
+| Method | Endpoint | Purpose |
+|---|---|---|
+| GET | `/api/aqi/current` | Current normalized AQI, pollutant sub-indices and source metadata |
+| GET | `/api/aqi/history` | Historical application data interface |
+| GET | `/api/aqi/forecast` | WAQI-based multi-day forecast data |
+| GET | `/api/aqi/pollutant/{pollutant}` | Pollutant detail and severity information |
+| GET | `/api/map` | Global WAQI map/station overview |
+
+### Health & Exposure
+
+| Method | Endpoint | Purpose |
+|---|---|---|
+| GET | `/api/health-risk` | Environmental health-risk assessment |
+| POST | `/api/exposure` | Exposure/activity guidance |
+
+### Authentication & User Data
+
+| Method | Endpoint | Purpose |
+|---|---|---|
+| POST | `/api/auth/register` | Create account |
+| POST | `/api/auth/login` | Login and issue tokens |
+| POST | `/api/auth/logout` | Clear authentication cookies |
+| GET | `/api/auth/me` | Current authenticated user |
+| POST | `/api/auth/refresh` | Refresh access token |
+| PATCH | `/api/auth/alerts` | Update AQI alert preferences |
+| GET | `/api/users/locations` | List saved locations |
+| POST | `/api/users/locations` | Save a location |
+
+The API uses HTTP-only secure cookies for access/refresh tokens and also supports a Bearer access token for authenticated requests.
 
 ---
 
-## 🧩 System Architecture
+## 🧩 Architecture
 
 ```mermaid
 flowchart LR
@@ -275,77 +295,68 @@ flowchart LR
     API --> WAQI[WAQI Live AQI API]
     API --> GEO[Open-Meteo Geocoding]
     API --> DB[(MongoDB Atlas)]
-    API --> AI[Gemini via Emergent Integration]
-    FE --> MAP[Leaflet + OpenStreetMap/CARTO]
+    API --> AI[Configured LLM Integration]
+    FE --> MAP[Leaflet + CARTO/OpenStreetMap]
     FE --> GLOBE[Three.js / React Three Fiber]
 ```
 
-### Production Architecture
+### Production stack
 
 | Layer | Technology | Responsibility |
 |---|---|---|
-| Frontend hosting | Cloudflare Pages | React production build and static delivery |
+| Frontend hosting | Cloudflare Pages | React production build |
 | Frontend | React | UI, routing, state and interaction |
-| Backend | FastAPI + Uvicorn | API, auth, AQI orchestration and business logic |
-| AQI provider | WAQI | Live station AQI and pollutant sub-indices |
-| Geocoding | Open-Meteo | Global location search fallback |
-| Database | MongoDB Atlas | Users, saved locations, dashboard/search data and application records |
-| AI | Gemini through Emergent integration | Context-aware air-quality assistant |
-| Maps | Leaflet + CARTO/OpenStreetMap | Global pollution map |
-| 3D | Three.js + React Three Fiber | Interactive Earth visualization |
+| Backend | FastAPI + Uvicorn | REST API, auth and AQI orchestration |
+| AQI provider | WAQI | Live station AQI, pollutant sub-indices and forecasts |
+| Geocoding | Open-Meteo | Server-side location search fallback |
+| Database | MongoDB Atlas | User and application records |
+| Maps | Leaflet + CARTO/OpenStreetMap | Interactive map |
+| 3D | Three.js + React Three Fiber | Interactive globe |
+| AI | Configured Gemini/Emergent integration | Air-quality assistant |
+
+> **OpenWeather is not used by the current OXYZEN AQI pipeline.**
 
 ---
 
 ## 🛠️ Tech Stack
 
-### 🖥️ Frontend
+### Frontend
 
-| Technology | Version | Purpose |
-|---|---:|---|
-| <img src="https://skillicons.dev/icons?i=react" width="20"/> **React** | 19.0.0 | Component-based frontend SPA |
-| <img src="https://skillicons.dev/icons?i=js" width="20"/> **JavaScript** | ES6+ | Application logic |
-| **React Router DOM** | 7.15.0 | Client-side routing |
-| **Axios** | 1.18.0 | REST API client |
-| **Tailwind CSS** | 3.4.17 | Utility-first styling |
-| **Recharts** | 3.6.0 | Responsive data visualization |
-| **Leaflet** | 1.9.4+ | Interactive maps |
-| **React Leaflet** | 5.0.0+ | React map bindings |
-| **Three.js** | 0.185.1+ | 3D rendering |
-| **React Three Fiber** | 9.7.0+ | React renderer for Three.js |
-| **Framer Motion** | 11.18.0 | UI motion and transitions |
-| **Lucide React** | 0.516.0 | SVG icon system |
-| **next-themes** | 0.4.6 | Dark theme handling |
-| **Sonner** | 2.0.3 | Toast notifications |
-| **CRACO** | 7.1.0 | Create React App configuration |
+- React 19
+- JavaScript / ES6+
+- React Router DOM
+- Axios
+- Tailwind CSS
+- Recharts
+- Leaflet / React Leaflet
+- Three.js / React Three Fiber
+- Framer Motion
+- Lucide React
+- next-themes
+- Sonner
 
-### ⚙️ Backend
+### Backend
 
-| Technology | Version | Purpose |
-|---|---:|---|
-| <img src="https://skillicons.dev/icons?i=python" width="20"/> **Python** | 3.11 | Backend runtime |
-| **FastAPI** | 0.110.1 | REST API framework |
-| **Uvicorn** | 0.25.0 | ASGI server |
-| **Pydantic** | 2.x | Request/data validation |
-| **Motor** | 3.3.1 | Async MongoDB driver |
-| **PyMongo** | 4.6.3 | MongoDB support |
-| **bcrypt** | 4.1.3 | Password hashing |
-| **PyJWT** | 2.10.1+ | JWT creation and validation |
-| **Requests** | 2.31.0+ | External HTTP APIs |
-| **Pandas / NumPy** | 2.2+ / 1.26+ | Data-processing dependencies |
-| **pytest** | 8.0+ | Automated testing framework |
+- Python 3.11
+- FastAPI
+- Uvicorn
+- Pydantic
+- Motor / PyMongo
+- bcrypt
+- PyJWT
+- Requests
+- Pandas / NumPy
+- pytest
 
-### ☁️ Cloud & External Services
+### Cloud & Services
 
-| Service | Purpose |
-|---|---|
-| **Cloudflare Pages** | Production React hosting |
-| **Render** | Dockerized FastAPI backend |
-| **MongoDB Atlas** | Managed MongoDB database |
-| **WAQI** | Live air-quality observations and forecasts |
-| **Open-Meteo** | Global geocoding search |
-| **Gemini** | AI assistant model |
-| **Emergent integration** | LLM integration layer |
-| **CARTO / OpenStreetMap** | Map tiles |
+- Cloudflare Pages
+- Render
+- MongoDB Atlas
+- WAQI
+- Open-Meteo Geocoding
+- Configured Gemini/Emergent AI integration
+- CARTO / OpenStreetMap map tiles
 
 ---
 
@@ -353,461 +364,160 @@ flowchart LR
 
 ```text
 oxyzen/
-│
-├── frontend/                         # React frontend
+├── frontend/
 │   ├── public/
-│   │   ├── index.html                # HTML shell and application title
-│   │   └── textures/                 # Globe textures/assets
-│   │
-│   ├── src/
-│   │   ├── components/
-│   │   │   ├── AIAssistant.jsx       # Floating OxyZen AI assistant
-│   │   │   ├── AQICard.jsx            # Current AQI presentation
-│   │   │   ├── AQIChart.jsx            # Recharts AQI visualization
-│   │   │   ├── AQIScale.jsx             # AQI category scale
-│   │   │   ├── ActivityGuidance.jsx     # Activity recommendations
-│   │   │   ├── EarthGlobe.jsx            # Interactive 3D globe
-│   │   │   ├── ExposureContext.jsx       # Exposure calculator UI
-│   │   │   ├── ForecastPanel.jsx          # Forecast cards
-│   │   │   ├── HealthRiskCard.jsx          # Risk score and contributors
-│   │   │   ├── LocationSearch.jsx          # Location search interface
-│   │   │   ├── Navbar.jsx                  # Responsive navigation
-│   │   │   ├── PollutantGrid.jsx            # Six-pollutant UI
-│   │   │   ├── ThemeToggle.jsx              # Theme switcher
-│   │   │   └── ui/                         # Reusable UI primitives
-│   │   │
-│   │   ├── context/
-│   │   │   ├── AuthContext.jsx             # Authentication state
-│   │   │   └── LocationContext.jsx          # Selected location state
-│   │   │
-│   │   ├── lib/
-│   │   │   ├── api.js                      # Axios API client
-│   │   │   └── aqiColors.js                 # AQI/risk color helpers
-│   │   │
-│   │   ├── pages/
-│   │   │   ├── Home.jsx                     # Landing page
-│   │   │   ├── AQIMonitor.jsx               # Main live monitoring dashboard
-│   │   │   ├── MapPage.jsx                   # Global pollution map
-│   │   │   ├── AQIInfo.jsx                   # AQI education
-│   │   │   ├── Tips.jsx                      # Health tips
-│   │   │   ├── Masks.jsx                     # Mask education
-│   │   │   ├── Login.jsx                     # Login
-│   │   │   ├── Register.jsx                  # Registration
-│   │   │   └── Dashboard.jsx                 # Saved locations and alerts
-│   │   │
-│   │   ├── App.js                            # Route definitions
-│   │   ├── App.css                            # Application styles
-│   │   └── index.css                          # Global styles
-│   │
-│   ├── craco.config.js
-│   └── package.json
+│   └── src/
+│       ├── components/
+│       │   ├── AQICard.jsx
+│       │   ├── AQIChart.jsx
+│       │   ├── AQIScale.jsx
+│       │   ├── ActivityGuidance.jsx
+│       │   ├── EarthGlobe.jsx
+│       │   ├── ExposureContext.jsx
+│       │   ├── ForecastPanel.jsx
+│       │   ├── HealthRiskCard.jsx
+│       │   ├── LocationSearch.jsx
+│       │   ├── PollutantGrid.jsx
+│       │   └── ...
+│       ├── context/
+│       ├── pages/
+│       └── App.js
 │
-├── backend/                            # FastAPI backend
-│   ├── server.py                        # Core API, auth, users and application routes
-│   ├── waqi_server.py                   # Live WAQI route entrypoint
-│   ├── aqi_data.py                      # WAQI adapter, geocoding and AQI helpers
-│   ├── health_risk.py                   # Explainable environmental risk engine
-│   ├── auth.py                           # bcrypt + JWT helpers
-│   ├── Dockerfile                        # Render production image
-│   ├── requirements.txt                  # Python dependencies
-│   └── tests/                            # Backend tests
+├── backend/
+│   ├── aqi_data.py
+│   ├── auth.py
+│   ├── health_risk.py
+│   ├── server.py
+│   ├── waqi_server.py
+│   ├── Dockerfile
+│   ├── render.yaml
+│   ├── requirements.txt
+│   └── tests/
 │
-├── tests/                               # Project-level tests/assets
-├── test_reports/                        # Test report artifacts
-├── memory/                              # Project support data
-├── worker.js                            # Cloudflare Worker deployment support
-├── wrangler.jsonc                       # Wrangler configuration
-├── package.json                          # Root deployment scripts
-└── README.md                             # Project documentation
+├── design_guidelines.json
+└── README.md
 ```
 
-> **Documentation policy:** OXYZEN intentionally keeps **one primary README** at the repository root. Deployment information is included here instead of maintaining separate README variants.
-
----
-
-## 🔌 API Endpoints
-
-Base path: `/api`
-
-### 🔐 Authentication
-
-| Method | Endpoint | Auth | Description |
-|---|---|---|---|
-| `POST` | `/auth/register` | ❌ | Create a user account |
-| `POST` | `/auth/login` | ❌ | Authenticate and issue tokens |
-| `POST` | `/auth/logout` | — | Clear authentication cookies |
-| `GET` | `/auth/me` | ✅ | Return current user |
-| `POST` | `/auth/refresh` | Cookie | Refresh the access token |
-| `PATCH` | `/auth/alerts` | ✅ | Update AQI alert preferences |
-
-### 📍 Location
-
-| Method | Endpoint | Auth | Description |
-|---|---|---|---|
-| `GET` | `/location/search` | ❌ | Search cities/locations |
-| `GET` | `/location/reverse` | ❌ | Resolve coordinates to a location |
-
-### 🌫️ Air Quality
-
-| Method | Endpoint | Auth | Description |
-|---|---|---|---|
-| `GET` | `/aqi/current` | ❌ | Live AQI and pollutant sub-indices |
-| `GET` | `/aqi/forecast` | ❌ | Available multi-day WAQI forecast |
-| `GET` | `/aqi/pollutant/{pollutant}` | ❌ | Current pollutant sub-index details |
-| `GET` | `/health-risk` | ❌ | Explainable environmental health-risk score |
-| `POST` | `/exposure` | ❌ | Calculate contextual exposure guidance |
-| `GET` | `/map` | ❌ | Live global map station data |
-
-Historical AQI pages/endpoints are intentionally **not part of the current product surface**.
-
-### 👤 Saved Locations & Dashboard
-
-| Method | Endpoint | Auth | Description |
-|---|---|---|---|
-| `GET` | `/users/locations` | ✅ | List saved locations |
-| `POST` | `/users/locations` | ✅ | Save a location |
-| `DELETE` | `/users/locations/{id}` | ✅ | Remove a saved location |
-| `GET` | `/users/dashboard` | ✅ | Dashboard data and recent searches |
-
-### 🤖 AI
-
-| Method | Endpoint | Auth | Description |
-|---|---|---|---|
-| `POST` | `/ai/chat` | ❌ | Streaming AI assistant response |
-| `GET` | `/ai/history/{session_id}` | ❌ | Retrieve chat session history |
-
-Interactive API documentation is available from FastAPI at `/docs` on the deployed backend.
-
----
-
-## 🔐 Authentication
-
-OXYZEN uses a lightweight token-based authentication flow:
-
-```text
-Register / Login
-       │
-       ▼
-  Access Token + Refresh Token
-       │
-       ├── httpOnly secure cookies
-       │
-       └── frontend bearer token support
-       │
-       ▼
- Protected API endpoints
-       │
-       ▼
- MongoDB user lookup
-```
-
-### Token Policy
-
-| Token | Lifetime | Purpose |
-|---|---:|---|
-| Access token | 7 days | Authenticated API access |
-| Refresh token | 30 days | Obtain a new access token |
-
-Passwords are hashed with **bcrypt** and never returned as part of public user data.
+`backend/waqi_server.py` is intentionally a thin Render entrypoint that imports the single FastAPI application from `server.py`, preventing a second AQI routing implementation from drifting from the main API.
 
 ---
 
 ## ⚙️ Environment Variables
 
-### Backend
+Backend secrets belong on the backend service and must never be committed to the frontend.
 
-Create/configure these variables on the backend service:
+Typical backend configuration includes:
 
-```env
-# MongoDB
-MONGO_URL=mongodb+srv://<user>:<password>@<cluster>/<database>
+```text
+MONGO_URL=<MongoDB connection string>
 DB_NAME=oxyzen
-
-# Authentication
-JWT_SECRET=your_long_random_secret
-
-# Live AQI provider
-WAQI_TOKEN=your_waqi_token
-
-# AI integration
-EMERGENT_LLM_KEY=your_emergent_key
+JWT_SECRET=<strong secret>
+WAQI_TOKEN=<WAQI API token>
+EMERGENT_LLM_KEY=<LLM integration key>
 AI_MODEL_PROVIDER=gemini
-AI_MODEL_NAME=gemini-3-flash-preview
-
-# Admin bootstrap
-ADMIN_EMAIL=your_admin_email
-ADMIN_PASSWORD=your_admin_password
-
-# CORS
-CORS_ORIGINS=https://your-frontend-domain.example
+AI_MODEL_NAME=<configured Gemini model>
 ```
 
-### Frontend
+Additional application/admin variables may be configured by the deployment environment.
 
-For a direct Render backend deployment, the frontend can use:
-
-```env
-REACT_APP_BACKEND_URL=https://your-backend.example.com
-```
-
-> ⚠️ **Never commit real credentials, API tokens, MongoDB passwords or JWT secrets to Git.** Backend secrets must remain on the server/hosting platform.
+> **Never commit API tokens, database credentials, JWT secrets or LLM keys to GitHub.**
 
 ---
 
 ## ☁️ Deployment
 
-OXYZEN is structured as a split production deployment:
+### Frontend — Cloudflare Pages
+
+The React frontend is deployed at:
 
 ```text
-                 ┌──────────────────────┐
-                 │    Cloudflare Pages  │
-                 │    React Frontend    │
-                 └──────────┬───────────┘
-                            │ HTTPS / REST
-                            ▼
-                 ┌──────────────────────┐
-                 │        Render        │
-                 │  FastAPI + Uvicorn  │
-                 └──────┬──────┬────────┘
-                        │      │
-              ┌─────────┘      └───────────┐
-              ▼                            ▼
-      ┌───────────────┐           ┌─────────────────┐
-      │ MongoDB Atlas │           │ WAQI / Open-   │
-      │               │           │ Meteo / Gemini │
-      └───────────────┘           └─────────────────┘
+https://oxyzen1.pages.dev
 ```
 
-### Cloudflare Pages
+### Backend — Render
 
-Recommended production build settings:
+The FastAPI backend is deployed at:
 
-| Setting | Value |
-|---|---|
-| Framework preset | None / Create React App |
-| Root directory | `frontend` |
-| Build command | `npm run build` |
-| Build output directory | `build` |
-| Production API variable | `REACT_APP_BACKEND_URL` |
-
-### Render
-
-The backend is containerized using `backend/Dockerfile` and starts with:
-
-```bash
-uvicorn waqi_server:app --host 0.0.0.0 --port 8000
+```text
+https://oxyzen-backend-5nvw.onrender.com
 ```
 
-### MongoDB Atlas
+Render runs the Dockerized backend through the `waqi_server:app` entrypoint.
 
-Create the `oxyzen` database and provide the backend service with a database user that has the required read/write permissions.
+### Database — MongoDB Atlas
+
+MongoDB Atlas stores user accounts, saved locations, AQI records and health-risk records used by the application.
 
 ---
 
 ## 💻 Getting Started
 
-### Prerequisites
+### Backend
 
 ```bash
-node -v       # Node.js 18+ recommended
-npm -v
-python --version   # Python 3.11
-```
-
-### 1. Clone the repository
-
-```bash
-git clone https://github.com/pranavreddy1721/oxyzen.git
-cd oxyzen
-```
-
-### 2. Install frontend dependencies
-
-```bash
-cd frontend
-npm install
-```
-
-### 3. Configure the backend
-
-```bash
-cd ../backend
+cd backend
 python -m venv .venv
 ```
 
-Activate the virtual environment:
-
-```bash
-# Windows
-.venv\Scripts\activate
-
-# macOS / Linux
-source .venv/bin/activate
-```
-
-Install dependencies:
+Activate the environment and install dependencies:
 
 ```bash
 pip install -r requirements.txt
 ```
 
-Create `backend/.env` with the required values from the environment-variable section.
-
-### 4. Start the backend
-
-```bash
-cd backend
-uvicorn server:app --reload --host 0.0.0.0 --port 8000
-```
-
-For the production WAQI entrypoint, use:
+Set the required environment variables and run:
 
 ```bash
 uvicorn waqi_server:app --host 0.0.0.0 --port 8000
 ```
 
-### 5. Start the frontend
-
-In a second terminal:
+### Frontend
 
 ```bash
 cd frontend
+npm install
 npm start
 ```
 
-The development frontend runs on the Create React App development server and calls the configured backend API.
+For production, build the frontend with:
+
+```bash
+npm run build
+```
 
 ---
 
-## 📱 Responsive Design
+## 🔒 Security & Data Handling
 
-The interface is built as a responsive single-page application:
-
-| Screen | Design approach |
-|---|---|
-| Desktop | Multi-column dashboards, full navigation and expanded visualizations |
-| Tablet | Adaptive grids and compressed navigation |
-| Mobile | Stacked cards, touch-friendly controls and collapsible navigation |
-
-Key responsive areas include:
-
-- Mobile navigation menu
-- AQI dashboard cards
-- Pollutant grid
-- Health-risk sections
-- Global map
-- 3D globe
-- Login/register forms
-- Dashboard saved-location cards
-- Floating AI assistant
-
----
-
-## 🔒 Security
-
-| Feature | Implementation |
-|---|---|
-| **Password hashing** | bcrypt |
-| **Access tokens** | JWT with 7-day expiry |
-| **Refresh tokens** | JWT with 30-day expiry |
-| **Cookie protection** | `HttpOnly`, `Secure`, `SameSite=None` in production |
-| **Input validation** | Pydantic models / FastAPI validation |
-| **Protected routes** | Dependency-based authenticated user resolution |
-| **Secret management** | Environment variables only |
-| **CORS** | Configurable allowed frontend origins |
-| **API errors** | Generic client-facing failures with server-side logging |
+- WAQI credentials remain server-side.
+- MongoDB credentials remain server-side.
+- JWT secrets remain server-side.
+- Authentication cookies are configured as HTTP-only, secure and cross-site compatible for the production deployment.
+- User-specific saved-location and dashboard routes require authentication.
+- AQI provider failures are handled by the backend rather than exposing provider credentials to the browser.
 
 ---
 
 ## ⚠️ Data & Medical Disclaimer
 
-### WAQI Data
+OXYZEN is an academic/software project intended to help users understand air-quality information. It is **not a medical device, diagnostic system or substitute for professional medical advice**.
 
-OXYZEN uses the **World Air Quality Index (WAQI)** for live air-quality observations and available forecasts.
+Live AQI values are provider observations associated with monitoring stations and can vary by station and time. A selected city may therefore be represented by a nearby/associated station when an exact city measurement is unavailable. OXYZEN exposes this distinction in its Live Data Source section.
 
-The application displays provider attribution and does not represent the data as an independently validated government measurement. WAQI pollutant values exposed through this integration are pollutant AQI sub-indices, not raw concentration measurements.
+Pollutant values displayed by the current WAQI integration are AQI sub-indices, not raw concentration measurements.
 
-### Health Information
-
-OXYZEN's health-risk score, activity guidance, exposure calculations, health tips and AI responses are **informational and educational only**.
-
-They are not medical diagnoses, clinical assessments or individualized medical advice. Users should consult qualified healthcare professionals and follow applicable local public-health guidance for health decisions.
-
----
-
-## 🧭 Product Scope
-
-The current OXYZEN product intentionally focuses on:
-
-```text
-✓ Live AQI
-✓ Pollutant sub-index analysis
-✓ Environmental health-risk awareness
-✓ Exposure guidance
-✓ Activity guidance
-✓ Live global map
-✓ 3D Earth visualization
-✓ Multi-day provider forecast
-✓ Global location search
-✓ User accounts
-✓ Saved locations
-✓ AQI alerts/preferences
-✓ OxyZen AI assistant
-✓ AQI education
-✓ Health tips
-✓ Mask education
-
-✗ Historical AQI product page
-✗ Fabricated historical data
-```
-
-This keeps the application aligned with the capabilities of the live data provider rather than generating unsupported historical values.
-
----
-
-## 🤝 Contributing
-
-Contributions are welcome.
-
-```bash
-# 1. Fork the repository
-
-# 2. Create a feature branch
-git checkout -b feature/AmazingFeature
-
-# 3. Make your changes
-
-# 4. Commit
-git commit -m "Add AmazingFeature"
-
-# 5. Push
-git push origin feature/AmazingFeature
-
-# 6. Open a Pull Request
-```
-
-Before submitting a PR:
-
-- Keep the frontend responsive.
-- Preserve API/provider attribution.
-- Never add simulated AQI values where live data is expected.
-- Never commit secrets.
-- Update this README when a major architectural or product change is introduced.
+WAQI attribution is required for applications using its programmatic data. See the official [WAQI API documentation](https://aqicn.org/api/) for provider usage terms and attribution requirements.
 
 ---
 
 ## 📄 License
 
-Distributed under the **MIT License**.
+This project is released under the MIT License. See the repository license file for the complete terms.
 
 ---
 
 <div align="center">
 
-**Built with ❤️ by [Pranav Reddy](https://github.com/pranavreddy1721)**
-
-<br/>
-
-<img src="https://capsule-render.vercel.app/api?type=waving&color=10B981&height=110&section=footer" width="100%" />
+**OXYZEN — Understand Your Air • Understand Your Health 🌿**
 
 </div>
