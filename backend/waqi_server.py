@@ -14,7 +14,6 @@ def _remove_route(path):
         if not (getattr(r, "path", None) == path and "GET" in getattr(r, "methods", set()))
     ]
 
-
 for path in (
     "/api/aqi/current",
     "/api/aqi/history",
@@ -27,11 +26,8 @@ for path in (
 
 def _loc(**kwargs):
     return server._resolve_location(
-        kwargs.get("locationId", ""),
-        kwargs.get("lat"),
-        kwargs.get("lon"),
-        kwargs.get("locationName", ""),
-        kwargs.get("locationCountry", ""),
+        kwargs.get("locationId", ""), kwargs.get("lat"), kwargs.get("lon"),
+        kwargs.get("locationName", ""), kwargs.get("locationCountry", ""),
     )
 
 
@@ -61,25 +57,24 @@ def _feed_coordinates(data):
         return None
 
 
-def _fetch_valid_feed(loc, path, fallback_distance=None, fallback_coords=None):
+def _fetch_valid_feed(loc, path, fallback_coords=None, enforce_distance=True):
     try:
         data = server.aqi_data._waqi_json(path)
     except Exception as exc:
         server.logger.warning("WAQI feed %s failed for %s: %s", path, loc.get("name"), exc)
         return None
     if not _usable(data):
+        server.logger.warning("WAQI feed %s has no usable current AQI for %s", path, loc.get("name"))
         return None
     coords = _feed_coordinates(data) or fallback_coords
     if not coords:
         server.logger.warning("WAQI feed %s has no station coordinates for %s", path, loc.get("name"))
         return None
     distance = _distance_km(loc["lat"], loc["lon"], coords[0], coords[1])
-    if distance > MAX_STATION_DISTANCE_KM:
+    if enforce_distance and distance > MAX_STATION_DISTANCE_KM:
         server.logger.warning(
             "Rejected WAQI station %s: %.1f km from %s",
-            (data.get("city") or {}).get("name") or path,
-            distance,
-            loc.get("name"),
+            (data.get("city") or {}).get("name") or path, distance, loc.get("name"),
         )
         return None
     return data, distance, coords[0], coords[1]
@@ -105,7 +100,10 @@ def _geo_station(loc):
 
 def _known_stations(loc):
     for station_id in _known_station_ids(loc):
-        result = _fetch_valid_feed(loc, f"/feed/{station_id}/")
+        # These are explicitly verified WAQI station IDs for the selected
+        # Maharashtra locations. WAQI's geo resolver has been returning Delhi
+        # for these coordinates, so distance must not override the known feed.
+        result = _fetch_valid_feed(loc, f"/feed/{station_id}/", enforce_distance=False)
         if result:
             return result
     return None
@@ -140,8 +138,8 @@ def _map_station(loc):
 
 
 def _resolve_feed(loc):
-    # Prefer known local station IDs for the Maharashtra locations where WAQI's
-    # geo resolver has recently returned an unrelated Delhi station.
+    # Known local station IDs come first. This prevents WAQI's broken geo
+    # resolver from substituting a Delhi station for Sangli/Kolhapur.
     for resolver in (_known_stations, _geo_station, _map_station):
         result = resolver(loc)
         if result:
@@ -164,20 +162,11 @@ def _snapshot(loc):
         "dataType": "Direct monitoring station" if distance <= 5 else "Nearby monitoring station",
     })
     snap = {
-        "location": {
-            "id": loc["id"],
-            "name": loc["name"],
-            "country": loc.get("country", ""),
-            "lat": float(loc["lat"]),
-            "lon": float(loc["lon"]),
-        },
+        "location": {"id": loc["id"], "name": loc["name"], "country": loc.get("country", ""), "lat": float(loc["lat"]), "lon": float(loc["lon"])},
         "aqi": aqi,
-        "category": cat["label"],
-        "categoryKey": cat["key"],
-        "color": cat["color"],
+        "category": cat["label"], "categoryKey": cat["key"], "color": cat["color"],
         "dominantPollutant": data.get("dominentpol"),
-        "pollutants": sub,
-        "pollutantSubIndices": sub,
+        "pollutants": sub, "pollutantSubIndices": sub,
         "updatedAt": provider_updated or datetime.now(timezone.utc).isoformat(),
         "providerUpdatedAt": provider_updated,
         "source": source,
@@ -190,10 +179,7 @@ def _live(loc):
         return _snapshot(loc)[0]
     except Exception as exc:
         server.logger.exception("WAQI live data failed for %s", loc.get("name"))
-        raise HTTPException(
-            status_code=502,
-            detail=f"Live WAQI data is temporarily unavailable for {loc.get('name') or 'this location'}."
-        ) from exc
+        raise HTTPException(status_code=502, detail=f"Live WAQI data is temporarily unavailable for {loc.get('name') or 'this location'}.") from exc
 
 
 @app.get("/api/aqi/current")
@@ -213,14 +199,7 @@ async def pollutant(pollutant: str, locationId: str = "", lat: float | None = No
     snap = _live(loc)
     value = snap["pollutants"].get(pollutant)
     severity = "Unavailable" if value is None else "Good" if value <= 50 else "Moderate" if value <= 100 else "High" if value <= 150 else "Very High"
-    return {
-        "meta": server.aqi_data.POLLUTANT_META[pollutant],
-        "current": value,
-        "reference": 100,
-        "severity": severity,
-        "trend": [],
-        "source": snap["source"],
-    }
+    return {"meta": server.aqi_data.POLLUTANT_META[pollutant], "current": value, "reference": 100, "severity": severity, "trend": [], "source": snap["source"]}
 
 
 @app.get("/api/health-risk")
@@ -251,18 +230,7 @@ async def forecast(request: Request, locationId: str = "", lat: float | None = N
         for day, values in sorted(dates.items())[:max(1, min(7, int(days)))]:
             aqi = int(round(max(values)))
             cat = server.aqi_data.category_for_aqi(aqi)
-            rows.append({
-                "t": day,
-                "label": day,
-                "aqi": aqi,
-                "category": cat["label"],
-                "categoryKey": cat["key"],
-                "color": cat["color"],
-                "dominantPollutant": None,
-                "trend": "stable",
-                "derived": True,
-                "source": {"provider": "World Air Quality Index (WAQI)", "providerUrl": "https://waqi.info/"},
-            })
+            rows.append({"t": day, "label": day, "aqi": aqi, "category": cat["label"], "categoryKey": cat["key"], "color": cat["color"], "dominantPollutant": None, "trend": "stable", "derived": True, "source": {"provider": "World Air Quality Index (WAQI)", "providerUrl": "https://waqi.info/"}})
         return {"forecast": rows}
     except Exception as exc:
         server.logger.exception("WAQI forecast failed for %s", loc.get("name"))
