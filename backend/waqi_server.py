@@ -13,7 +13,7 @@ def _remove_route(path: str):
     ]
 
 
-for _path in ("/api/aqi/current", "/api/aqi/pollutant/{pollutant}", "/api/health-risk"):
+for _path in ("/api/aqi/current", "/api/aqi/history", "/api/aqi/pollutant/{pollutant}", "/api/health-risk"):
     _remove_route(_path)
 
 
