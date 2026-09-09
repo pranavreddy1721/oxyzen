@@ -1,11 +1,11 @@
-"""Render entrypoint for live WAQI AQI routes."""
+"""Render entrypoint for live WAQI data with safe station selection."""
 import math
 from datetime import datetime, timezone
 from fastapi import HTTPException, Request
 import server
 
 app = server.app
-MAX_STATION_DISTANCE_KM = 75.0
+MAX_STATION_DISTANCE_KM = 100.0
 
 
 def _remove_route(path):
@@ -14,22 +14,31 @@ def _remove_route(path):
         if not (getattr(r, "path", None) == path and "GET" in getattr(r, "methods", set()))
     ]
 
-for path in ("/api/aqi/current", "/api/aqi/history", "/api/aqi/pollutant/{pollutant}", "/api/health-risk", "/api/aqi/forecast"):
+
+for path in (
+    "/api/aqi/current",
+    "/api/aqi/history",
+    "/api/aqi/pollutant/{pollutant}",
+    "/api/health-risk",
+    "/api/aqi/forecast",
+):
     _remove_route(path)
 
 
 def _loc(**kwargs):
     return server._resolve_location(
-        kwargs.get("locationId", ""), kwargs.get("lat"), kwargs.get("lon"),
-        kwargs.get("locationName", ""), kwargs.get("locationCountry", "")
+        kwargs.get("locationId", ""),
+        kwargs.get("lat"),
+        kwargs.get("lon"),
+        kwargs.get("locationName", ""),
+        kwargs.get("locationCountry", ""),
     )
 
 
 def _distance_km(lat1, lon1, lat2, lon2):
     r = 6371.0
     p1, p2 = math.radians(float(lat1)), math.radians(float(lat2))
-    dp = math.radians(float(lat2) - float(lat1))
-    dl = math.radians(float(lon2) - float(lon1))
+    dp, dl = math.radians(float(lat2) - float(lat1)), math.radians(float(lon2) - float(lon1))
     a = math.sin(dp / 2) ** 2 + math.cos(p1) * math.cos(p2) * math.sin(dl / 2) ** 2
     return 2 * r * math.asin(math.sqrt(a))
 
@@ -42,8 +51,7 @@ def _usable(data):
         return False
 
 
-def _geo_coordinates(data):
-    """WAQI city.geo is [latitude, longitude]."""
+def _feed_coordinates(data):
     geo = ((data or {}).get("city") or {}).get("geo") or []
     if len(geo) < 2:
         return None
@@ -53,41 +61,64 @@ def _geo_coordinates(data):
         return None
 
 
-def _try_geo(loc):
-    lat, lon = float(loc["lat"]), float(loc["lon"])
+def _fetch_valid_feed(loc, path, fallback_distance=None, fallback_coords=None):
     try:
-        data = server.aqi_data._waqi_json(f"/feed/geo:{lat};{lon}/")
-        if not _usable(data):
-            return None
-        coords = _geo_coordinates(data)
-        if not coords:
-            # Some WAQI responses do not expose station coordinates. The geo
-            # endpoint itself is still a location-constrained response, so use
-            # the selected point only as a last-resort source coordinate.
-            return data, 0.0, lat, lon
-        slat, slon = coords
-        distance = _distance_km(lat, lon, slat, slon)
-        if distance > MAX_STATION_DISTANCE_KM:
-            server.logger.warning(
-                "Rejected WAQI geo station %s: %.1f km from %s",
-                ((data.get("city") or {}).get("name")), distance, loc.get("name")
-            )
-            return None
-        return data, distance, slat, slon
+        data = server.aqi_data._waqi_json(path)
     except Exception as exc:
-        server.logger.warning("WAQI geo lookup failed for %s: %s", loc.get("name"), exc)
+        server.logger.warning("WAQI feed %s failed for %s: %s", path, loc.get("name"), exc)
         return None
+    if not _usable(data):
+        return None
+    coords = _feed_coordinates(data) or fallback_coords
+    if not coords:
+        server.logger.warning("WAQI feed %s has no station coordinates for %s", path, loc.get("name"))
+        return None
+    distance = _distance_km(loc["lat"], loc["lon"], coords[0], coords[1])
+    if distance > MAX_STATION_DISTANCE_KM:
+        server.logger.warning(
+            "Rejected WAQI station %s: %.1f km from %s",
+            (data.get("city") or {}).get("name") or path,
+            distance,
+            loc.get("name"),
+        )
+        return None
+    return data, distance, coords[0], coords[1]
 
 
-def _try_map(loc):
+def _known_station_ids(loc):
+    loc_id = str(loc.get("id") or "").lower()
+    name = str(loc.get("name") or "").lower()
+    country = str(loc.get("country") or "").lower()
+    if "kolhapur" in loc_id or "kolhapur" in name:
+        return ["A567994", "A567991"]
+    if "sangli" in loc_id or "sangli" in name:
+        return ["A568009"]
+    if "india" in country and ("sangli" in name or "kolhapur" in name):
+        return ["A568009", "A567994", "A567991"]
+    return []
+
+
+def _geo_station(loc):
     lat, lon = float(loc["lat"]), float(loc["lon"])
-    bounds = f"{lat - 0.5},{lon - 0.5},{lat + 0.5},{lon + 0.5}"
+    return _fetch_valid_feed(loc, f"/feed/geo:{lat};{lon}/")
+
+
+def _known_stations(loc):
+    for station_id in _known_station_ids(loc):
+        result = _fetch_valid_feed(loc, f"/feed/{station_id}/")
+        if result:
+            return result
+    return None
+
+
+def _map_station(loc):
+    lat, lon = float(loc["lat"]), float(loc["lon"])
+    bounds = f"{lat - 1.0},{lon - 1.0},{lat + 1.0},{lon + 1.0}"
     try:
         stations = server.aqi_data._waqi_json("/map/bounds/", {"latlng": bounds})
     except Exception as exc:
-        server.logger.warning("WAQI map lookup failed for %s: %s", loc.get("name"), exc)
+        server.logger.warning("WAQI station map lookup failed for %s: %s", loc.get("name"), exc)
         return None
-
     candidates = []
     for item in stations if isinstance(stations, list) else []:
         uid = item.get("uid")
@@ -95,36 +126,31 @@ def _try_map(loc):
             slat, slon = float(item["lat"]), float(item["lon"])
             if uid is None:
                 continue
-            distance = _distance_km(lat, lon, slat, slon)
-            if distance <= MAX_STATION_DISTANCE_KM:
-                candidates.append((distance, str(uid), slat, slon))
+            d = _distance_km(lat, lon, slat, slon)
+            if d <= MAX_STATION_DISTANCE_KM:
+                candidates.append((d, str(uid), slat, slon))
         except (KeyError, TypeError, ValueError):
             continue
-
     candidates.sort(key=lambda x: x[0])
-    for distance, uid, slat, slon in candidates:
-        try:
-            data = server.aqi_data._waqi_json(f"/feed/@{uid}/")
-            if _usable(data):
-                coords = _geo_coordinates(data)
-                if coords:
-                    slat2, slon2 = coords
-                    distance2 = _distance_km(lat, lon, slat2, slon2)
-                    if distance2 > MAX_STATION_DISTANCE_KM:
-                        continue
-                    return data, distance2, slat2, slon2
-                return data, distance, slat, slon
-        except Exception as exc:
-            server.logger.warning("WAQI station %s failed: %s", uid, exc)
+    for d, uid, slat, slon in candidates:
+        result = _fetch_valid_feed(loc, f"/feed/@{uid}/", fallback_coords=(slat, slon))
+        if result:
+            return result
     return None
 
 
-def _snapshot(loc):
-    result = _try_geo(loc) or _try_map(loc)
-    if not result:
-        raise RuntimeError(f"No usable WAQI station within {MAX_STATION_DISTANCE_KM:.0f} km")
+def _resolve_feed(loc):
+    # Prefer known local station IDs for the Maharashtra locations where WAQI's
+    # geo resolver has recently returned an unrelated Delhi station.
+    for resolver in (_known_stations, _geo_station, _map_station):
+        result = resolver(loc)
+        if result:
+            return result
+    raise RuntimeError(f"No usable WAQI station within {MAX_STATION_DISTANCE_KM:.0f} km")
 
-    data, distance, slat, slon = result
+
+def _snapshot(loc):
+    data, distance, slat, slon = _resolve_feed(loc)
     aqi = max(0, min(500, int(str(data["aqi"]).strip())))
     sub = server.aqi_data._subindices(data)
     cat = server.aqi_data.category_for_aqi(aqi)
@@ -139,8 +165,11 @@ def _snapshot(loc):
     })
     snap = {
         "location": {
-            "id": loc["id"], "name": loc["name"], "country": loc.get("country", ""),
-            "lat": float(loc["lat"]), "lon": float(loc["lon"])
+            "id": loc["id"],
+            "name": loc["name"],
+            "country": loc.get("country", ""),
+            "lat": float(loc["lat"]),
+            "lon": float(loc["lon"]),
         },
         "aqi": aqi,
         "category": cat["label"],
@@ -182,9 +211,16 @@ async def pollutant(pollutant: str, locationId: str = "", lat: float | None = No
         raise HTTPException(status_code=404, detail="Unknown pollutant")
     loc = _loc(locationId=locationId, lat=lat, lon=lon, locationName=locationName, locationCountry=locationCountry)
     snap = _live(loc)
-    current_value = snap["pollutants"].get(pollutant)
-    severity = "Unavailable" if current_value is None else "Good" if current_value <= 50 else "Moderate" if current_value <= 100 else "High" if current_value <= 150 else "Very High"
-    return {"meta": server.aqi_data.POLLUTANT_META[pollutant], "current": current_value, "reference": 100, "severity": severity, "trend": [], "source": snap["source"]}
+    value = snap["pollutants"].get(pollutant)
+    severity = "Unavailable" if value is None else "Good" if value <= 50 else "Moderate" if value <= 100 else "High" if value <= 150 else "Very High"
+    return {
+        "meta": server.aqi_data.POLLUTANT_META[pollutant],
+        "current": value,
+        "reference": 100,
+        "severity": severity,
+        "trend": [],
+        "source": snap["source"],
+    }
 
 
 @app.get("/api/health-risk")
@@ -215,7 +251,18 @@ async def forecast(request: Request, locationId: str = "", lat: float | None = N
         for day, values in sorted(dates.items())[:max(1, min(7, int(days)))]:
             aqi = int(round(max(values)))
             cat = server.aqi_data.category_for_aqi(aqi)
-            rows.append({"t": day, "label": day, "aqi": aqi, "category": cat["label"], "categoryKey": cat["key"], "color": cat["color"], "dominantPollutant": None, "trend": "stable", "derived": True, "source": {"provider": "World Air Quality Index (WAQI)", "providerUrl": "https://waqi.info/"}})
+            rows.append({
+                "t": day,
+                "label": day,
+                "aqi": aqi,
+                "category": cat["label"],
+                "categoryKey": cat["key"],
+                "color": cat["color"],
+                "dominantPollutant": None,
+                "trend": "stable",
+                "derived": True,
+                "source": {"provider": "World Air Quality Index (WAQI)", "providerUrl": "https://waqi.info/"},
+            })
         return {"forecast": rows}
     except Exception as exc:
         server.logger.exception("WAQI forecast failed for %s", loc.get("name"))
