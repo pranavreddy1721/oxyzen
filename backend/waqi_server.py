@@ -1,4 +1,4 @@
-"""Render entrypoint for live WAQI data with safe station selection."""
+"""Render entrypoint for live WAQI data with one consistent, safe station resolver."""
 import math
 from datetime import datetime, timezone
 from fastapi import HTTPException, Request
@@ -14,6 +14,9 @@ def _remove_route(path):
         if not (getattr(r, "path", None) == path and "GET" in getattr(r, "methods", set()))
     ]
 
+
+# Replace the original AQI routes so every AQI-related endpoint uses exactly
+# the same station-selection and source metadata logic.
 for path in (
     "/api/aqi/current",
     "/api/aqi/history",
@@ -26,23 +29,27 @@ for path in (
 
 def _loc(**kwargs):
     return server._resolve_location(
-        kwargs.get("locationId", ""), kwargs.get("lat"), kwargs.get("lon"),
-        kwargs.get("locationName", ""), kwargs.get("locationCountry", ""),
+        kwargs.get("locationId", ""),
+        kwargs.get("lat"),
+        kwargs.get("lon"),
+        kwargs.get("locationName", ""),
+        kwargs.get("locationCountry", ""),
     )
 
 
 def _distance_km(lat1, lon1, lat2, lon2):
     r = 6371.0
     p1, p2 = math.radians(float(lat1)), math.radians(float(lat2))
-    dp, dl = math.radians(float(lat2) - float(lat1)), math.radians(float(lon2) - float(lon1))
+    dp = math.radians(float(lat2) - float(lat1))
+    dl = math.radians(float(lon2) - float(lon1))
     a = math.sin(dp / 2) ** 2 + math.cos(p1) * math.cos(p2) * math.sin(dl / 2) ** 2
     return 2 * r * math.asin(math.sqrt(a))
 
 
 def _usable(data):
     try:
-        int(str((data or {}).get("aqi")).strip())
-        return True
+        value = int(str((data or {}).get("aqi")).strip())
+        return value >= 0
     except (TypeError, ValueError):
         return False
 
@@ -63,18 +70,27 @@ def _fetch_valid_feed(loc, path, fallback_coords=None, enforce_distance=True):
     except Exception as exc:
         server.logger.warning("WAQI feed %s failed for %s: %s", path, loc.get("name"), exc)
         return None
+
     if not _usable(data):
-        server.logger.warning("WAQI feed %s has no usable current AQI for %s", path, loc.get("name"))
+        server.logger.warning(
+            "WAQI feed %s has no usable current AQI for %s", path, loc.get("name")
+        )
         return None
+
     coords = _feed_coordinates(data) or fallback_coords
     if not coords:
-        server.logger.warning("WAQI feed %s has no station coordinates for %s", path, loc.get("name"))
+        server.logger.warning(
+            "WAQI feed %s has no station coordinates for %s", path, loc.get("name")
+        )
         return None
+
     distance = _distance_km(loc["lat"], loc["lon"], coords[0], coords[1])
     if enforce_distance and distance > MAX_STATION_DISTANCE_KM:
         server.logger.warning(
             "Rejected WAQI station %s: %.1f km from %s",
-            (data.get("city") or {}).get("name") or path, distance, loc.get("name"),
+            (data.get("city") or {}).get("name") or path,
+            distance,
+            loc.get("name"),
         )
         return None
     return data, distance, coords[0], coords[1]
@@ -84,29 +100,31 @@ def _known_station_ids(loc):
     loc_id = str(loc.get("id") or "").lower()
     name = str(loc.get("name") or "").lower()
     country = str(loc.get("country") or "").lower()
+
     if "kolhapur" in loc_id or "kolhapur" in name:
         return ["A567994", "A567991"]
     if "sangli" in loc_id or "sangli" in name:
+        # WAQI lists A568009 as Vijay Nagar, Sangli / Hanchinala.
         return ["A568009"]
-    if "india" in country and ("sangli" in name or "kolhapur" in name):
+    if country == "india" and ("sangli" in name or "kolhapur" in name):
         return ["A568009", "A567994", "A567991"]
     return []
+
+
+def _known_stations(loc):
+    for station_id in _known_station_ids(loc):
+        # These IDs are explicitly verified WAQI stations associated with the
+        # selected Maharashtra locations. Do not reject them just because the
+        # WAQI geo resolver reports unrelated Delhi coordinates.
+        result = _fetch_valid_feed(loc, f"/feed/{station_id}/", enforce_distance=False)
+        if result:
+            return result
+    return None
 
 
 def _geo_station(loc):
     lat, lon = float(loc["lat"]), float(loc["lon"])
     return _fetch_valid_feed(loc, f"/feed/geo:{lat};{lon}/")
-
-
-def _known_stations(loc):
-    for station_id in _known_station_ids(loc):
-        # These are explicitly verified WAQI station IDs for the selected
-        # Maharashtra locations. WAQI's geo resolver has been returning Delhi
-        # for these coordinates, so distance must not override the known feed.
-        result = _fetch_valid_feed(loc, f"/feed/{station_id}/", enforce_distance=False)
-        if result:
-            return result
-    return None
 
 
 def _map_station(loc):
@@ -117,6 +135,7 @@ def _map_station(loc):
     except Exception as exc:
         server.logger.warning("WAQI station map lookup failed for %s: %s", loc.get("name"), exc)
         return None
+
     candidates = []
     for item in stations if isinstance(stations, list) else []:
         uid = item.get("uid")
@@ -129,8 +148,9 @@ def _map_station(loc):
                 candidates.append((d, str(uid), slat, slon))
         except (KeyError, TypeError, ValueError):
             continue
+
     candidates.sort(key=lambda x: x[0])
-    for d, uid, slat, slon in candidates:
+    for _, uid, slat, slon in candidates:
         result = _fetch_valid_feed(loc, f"/feed/@{uid}/", fallback_coords=(slat, slon))
         if result:
             return result
@@ -138,8 +158,8 @@ def _map_station(loc):
 
 
 def _resolve_feed(loc):
-    # Known local station IDs come first. This prevents WAQI's broken geo
-    # resolver from substituting a Delhi station for Sangli/Kolhapur.
+    # Known verified stations first, then only geographically valid WAQI
+    # results. This prevents a Delhi station from being used for Sangli.
     for resolver in (_known_stations, _geo_station, _map_station):
         result = resolver(loc)
         if result:
@@ -161,17 +181,22 @@ def _snapshot(loc):
         "matchType": "direct" if distance <= 5 else "nearby",
         "dataType": "Direct monitoring station" if distance <= 5 else "Nearby monitoring station",
     })
-    snap = {
-        "location": {"id": loc["id"], "name": loc["name"], "country": loc.get("country", ""), "lat": float(loc["lat"]), "lon": float(loc["lon"])},
+    return {
+        "location": {
+            "id": loc["id"], "name": loc["name"], "country": loc.get("country", ""),
+            "lat": float(loc["lat"]), "lon": float(loc["lon"]),
+        },
         "aqi": aqi,
-        "category": cat["label"], "categoryKey": cat["key"], "color": cat["color"],
+        "category": cat["label"],
+        "categoryKey": cat["key"],
+        "color": cat["color"],
         "dominantPollutant": data.get("dominentpol"),
-        "pollutants": sub, "pollutantSubIndices": sub,
+        "pollutants": sub,
+        "pollutantSubIndices": sub,
         "updatedAt": provider_updated or datetime.now(timezone.utc).isoformat(),
         "providerUpdatedAt": provider_updated,
         "source": source,
-    }
-    return snap, data
+    }, data
 
 
 def _live(loc):
@@ -179,41 +204,116 @@ def _live(loc):
         return _snapshot(loc)[0]
     except Exception as exc:
         server.logger.exception("WAQI live data failed for %s", loc.get("name"))
-        raise HTTPException(status_code=502, detail=f"Live WAQI data is temporarily unavailable for {loc.get('name') or 'this location'}.") from exc
+        raise HTTPException(
+            status_code=502,
+            detail=f"Live WAQI data is temporarily unavailable for {loc.get('name') or 'this location'}."
+        ) from exc
 
 
 @app.get("/api/aqi/current")
-async def current(request: Request, locationId: str = "", lat: float | None = None, lon: float | None = None, locationName: str = "", locationCountry: str = ""):
+async def current(
+    request: Request,
+    locationId: str = "",
+    lat: float | None = None,
+    lon: float | None = None,
+    locationName: str = "",
+    locationCountry: str = "",
+):
     loc = _loc(locationId=locationId, lat=lat, lon=lon, locationName=locationName, locationCountry=locationCountry)
     snap = _live(loc)
     snap["scale"] = server.aqi_data.AQI_CATEGORIES
     snap["pollutantMeta"] = server.aqi_data.POLLUTANT_META
+
+    # Preserve the existing history feature without making authentication
+    # mandatory for the public AQI endpoint.
+    uid = None
+    try:
+        uid = str((await server.get_current_user(request))["_id"])
+    except HTTPException:
+        pass
+    await server._log_history(loc, snap, uid)
     return snap
 
 
 @app.get("/api/aqi/pollutant/{pollutant}")
-async def pollutant(pollutant: str, locationId: str = "", lat: float | None = None, lon: float | None = None, locationName: str = "", locationCountry: str = ""):
+async def pollutant(
+    pollutant: str,
+    locationId: str = "",
+    lat: float | None = None,
+    lon: float | None = None,
+    locationName: str = "",
+    locationCountry: str = "",
+):
     if pollutant not in server.aqi_data.POLLUTANT_META:
         raise HTTPException(status_code=404, detail="Unknown pollutant")
     loc = _loc(locationId=locationId, lat=lat, lon=lon, locationName=locationName, locationCountry=locationCountry)
     snap = _live(loc)
     value = snap["pollutants"].get(pollutant)
-    severity = "Unavailable" if value is None else "Good" if value <= 50 else "Moderate" if value <= 100 else "High" if value <= 150 else "Very High"
-    return {"meta": server.aqi_data.POLLUTANT_META[pollutant], "current": value, "reference": 100, "severity": severity, "trend": [], "source": snap["source"]}
+    if value is None:
+        severity = "Unavailable"
+    elif value <= 50:
+        severity = "Good"
+    elif value <= 100:
+        severity = "Moderate"
+    elif value <= 150:
+        severity = "High"
+    else:
+        severity = "Very High"
+    return {
+        "meta": server.aqi_data.POLLUTANT_META[pollutant],
+        "current": value,
+        "reference": 100,
+        "severity": severity,
+        "trend": [],
+        "source": snap["source"],
+    }
 
 
 @app.get("/api/health-risk")
-async def health_risk(request: Request, locationId: str = "", lat: float | None = None, lon: float | None = None, locationName: str = "", locationCountry: str = ""):
+async def health_risk(
+    request: Request,
+    locationId: str = "",
+    lat: float | None = None,
+    lon: float | None = None,
+    locationName: str = "",
+    locationCountry: str = "",
+):
     loc = _loc(locationId=locationId, lat=lat, lon=lon, locationName=locationName, locationCountry=locationCountry)
     snap = _live(loc)
     result = server.health_risk.assess(snap["aqi"], snap["pollutants"])
     result["location"] = {k: loc[k] for k in ("id", "name", "country")}
     result["source"] = snap["source"]
+
+    uid = None
+    try:
+        uid = str((await server.get_current_user(request))["_id"])
+    except HTTPException:
+        pass
+    try:
+        await server.db.health_risk_records.insert_one({
+            "locationId": loc["id"],
+            "locationName": loc["name"],
+            "riskScore": result["riskScore"],
+            "riskLevel": result["riskLevel"],
+            "aqi": snap["aqi"],
+            "userId": uid,
+            "createdAt": datetime.now(timezone.utc).isoformat(),
+        })
+    except Exception as exc:
+        server.logger.warning("health-risk history log failed: %s", exc)
     return result
 
 
 @app.get("/api/aqi/forecast")
-async def forecast(request: Request, locationId: str = "", lat: float | None = None, lon: float | None = None, locationName: str = "", locationCountry: str = "", days: int = 5):
+async def forecast(
+    request: Request,
+    locationId: str = "",
+    lat: float | None = None,
+    lon: float | None = None,
+    locationName: str = "",
+    locationCountry: str = "",
+    days: int = 5,
+):
     loc = _loc(locationId=locationId, lat=lat, lon=lon, locationName=locationName, locationCountry=locationCountry)
     try:
         _, data = _snapshot(loc)
@@ -226,12 +326,34 @@ async def forecast(request: Request, locationId: str = "", lat: float | None = N
                 day, avg = item.get("day"), item.get("avg")
                 if day is not None and isinstance(avg, (int, float)):
                     dates.setdefault(day, []).append(float(avg))
+
         rows = []
-        for day, values in sorted(dates.items())[:max(1, min(7, int(days)))]:
+        limit = max(1, min(7, int(days)))
+        for day, values in sorted(dates.items())[:limit]:
             aqi = int(round(max(values)))
             cat = server.aqi_data.category_for_aqi(aqi)
-            rows.append({"t": day, "label": day, "aqi": aqi, "category": cat["label"], "categoryKey": cat["key"], "color": cat["color"], "dominantPollutant": None, "trend": "stable", "derived": True, "source": {"provider": "World Air Quality Index (WAQI)", "providerUrl": "https://waqi.info/"}})
-        return {"forecast": rows}
+            rows.append({
+                "t": day,
+                "label": day,
+                "aqi": aqi,
+                "category": cat["label"],
+                "categoryKey": cat["key"],
+                "color": cat["color"],
+                "dominantPollutant": None,
+                "trend": "stable",
+                "derived": True,
+                "source": {
+                    "provider": "World Air Quality Index (WAQI)",
+                    "providerUrl": "https://waqi.info/",
+                },
+            })
+        return {
+            "forecast": rows,
+            "location": {k: loc[k] for k in ("id", "name", "country")},
+        }
     except Exception as exc:
         server.logger.exception("WAQI forecast failed for %s", loc.get("name"))
-        return {"forecast": []}
+        return {
+            "forecast": [],
+            "location": {k: loc[k] for k in ("id", "name", "country")},
+        }
