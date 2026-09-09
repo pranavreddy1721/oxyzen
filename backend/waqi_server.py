@@ -1,5 +1,6 @@
 """Render entrypoint for live WAQI data with strict station-location validation."""
 import math
+from datetime import datetime, timezone
 from fastapi import HTTPException, Request
 
 import server
@@ -98,7 +99,7 @@ def _snapshot(loc):
     sub = server.aqi_data._subindices(data)
     cat = server.aqi_data.category_for_aqi(aqi)
     provider_updated = ((data.get("time") or {}).get("iso") or (data.get("time") or {}).get("s"))
-    updated = provider_updated or server.datetime.now(server.timezone.utc).isoformat()
+    updated = provider_updated or datetime.now(timezone.utc).isoformat()
 
     source = server.aqi_data._source(data)
     source.update({
