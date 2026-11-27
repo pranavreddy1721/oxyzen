@@ -561,20 +561,13 @@ app.add_middleware(
 )
 
 
-@app.on_event("startup")
-async def startup():
-    try:
-        await db.users.create_index("email", unique=True)
-        await db.saved_locations.create_index([("userId", 1), ("locationId", 1)])
-        await db.aqi_records.create_index([("userId", 1), ("createdAt", -1)])
-        await db.aqi_notifications.create_index([("userId", 1), ("createdAt", -1)])
-        await db.aqi_notifications.create_index("eventKey", unique=True)
-        await db.aqi_alert_states.create_index("userId")
-    except Exception as e:
-        logger.warning(f"index creation: {e}")
-    # AQI alert checks run as a scheduled one-shot worker (GitHub Actions).
-    # Do not run a second in-process monitor here: Render free web services sleep/restart.
-    logger.info("AQI alert monitoring is handled by the external scheduled worker.")
+async def _initialize_database():
+    await db.users.create_index("email", unique=True)
+    await db.saved_locations.create_index([("userId", 1), ("locationId", 1)])
+    await db.aqi_records.create_index([("userId", 1), ("createdAt", -1)])
+    await db.aqi_notifications.create_index([("userId", 1), ("createdAt", -1)])
+    await db.aqi_notifications.create_index("eventKey", unique=True)
+    await db.aqi_alert_states.create_index("userId")
 
     # seed admin
     admin_email = os.environ.get("ADMIN_EMAIL", "admin@oxyzen.app")
@@ -591,6 +584,23 @@ async def startup():
         logger.info("seeded admin user")
     elif not verify_password(admin_password, existing["password_hash"]):
         await db.users.update_one({"email": admin_email}, {"$set": {"password_hash": hash_password(admin_password)}})
+
+
+@app.on_event("startup")
+async def startup():
+    # AQI alert checks run as a scheduled one-shot worker (GitHub Actions).
+    # Do not run a second in-process monitor here: Render free web services sleep/restart.
+    logger.info("AQI alert monitoring is handled by the external scheduled worker.")
+
+    # MongoDB initialization must not hold the HTTP server in startup indefinitely.
+    # AQI endpoints can serve live provider data without MongoDB; history/auth need it.
+    try:
+        await asyncio.wait_for(_initialize_database(), timeout=12)
+        logger.info("MongoDB indexes and admin initialization completed.")
+    except asyncio.TimeoutError:
+        logger.warning("MongoDB initialization timed out after 12s; starting API without database initialization.")
+    except Exception as e:
+        logger.warning("MongoDB initialization failed; starting API with database-dependent features unavailable: %s", e)
 
 
 @app.on_event("shutdown")
