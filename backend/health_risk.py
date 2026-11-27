@@ -23,9 +23,9 @@ def _norm(value,high):
     except (TypeError,ValueError):
         return None
 
-def _aqi_only_score(aqi):
-    """Map US AQI bands to the app's 0-100 awareness indicator (not a clinical risk)."""
-    points=((0,0),(50,20),(100,40),(150,60),(200,80),(300,90),(500,100))
+def _aqi_only_score(aqi, scale="us"):
+    """Map the selected AQI scale to the app's 0-100 awareness indicator."""
+    points = ((0, 0), (50, 20), (100, 40), (200, 60), (300, 80), (400, 90), (500, 100)) if scale == "india_cpcb" else ((0, 0), (50, 20), (100, 40), (150, 60), (200, 80), (300, 90), (500, 100))
     value=max(0.0,min(500.0,float(aqi)))
     for (x0,y0),(x1,y1) in zip(points,points[1:]):
         if value<=x1:
@@ -52,7 +52,7 @@ def _source_completeness(available, pollutant_sources):
     }
 
 
-def assess(aqi:int,pollutants:dict,pollutant_sources:dict=None,aqi_source:dict=None)->dict:
+def assess(aqi:int,pollutants:dict,pollutant_sources:dict=None,aqi_source:dict=None,aqi_scale="us")->dict:
     pollutants=pollutants or {}
     pollutant_sources=pollutant_sources or {}
     subs={k:_norm(pollutants.get(k),HIGH_LEVEL[k]) for k in HIGH_LEVEL}
@@ -78,18 +78,18 @@ def assess(aqi:int,pollutants:dict,pollutant_sources:dict=None,aqi_source:dict=N
         # Convert every US-AQI sub-index to the same app-defined 0-100 indicator
         # scale before applying weights. This avoids treating raw index values
         # as concentrations or mixing incompatible units.
-        contributors_raw["AQI"]=_aqi_only_score(aqi_value)*WEIGHTS["aqi"]
+        contributors_raw["AQI"]=_aqi_only_score(aqi_value, aqi_scale)*WEIGHTS["aqi"]
         for k in available:
-            contributors_raw[POLLUTANT_META[k]["name"]]=_aqi_only_score(pollutants[k])*WEIGHTS[k]
+            contributors_raw[POLLUTANT_META[k]["name"]]=_aqi_only_score(pollutants[k], aqi_scale)*WEIGHTS[k]
         denominator=WEIGHTS["aqi"]+sum(WEIGHTS[k] for k in available)
         score=int(round(sum(contributors_raw.values())/denominator)) if denominator else 0
         mode="pollutant_weighted"
         mode_label="Pollutant-weighted indicator"
         top_names=[name for name,value in sorted(contributors_raw.items(),key=lambda item:item[1],reverse=True)[:2] if value>0]
         explanation=_explanation(_band(max(0,min(100,score)))[1],top_names)
-        explanation += " This score uses available WAQI station and/or Open-Meteo modelled pollutant AQI sub-indices."
+        explanation += " This score uses available station and/or modelled pollutant AQI sub-indices."
     else:
-        score=_aqi_only_score(aqi_value)
+        score=_aqi_only_score(aqi_value, aqi_scale)
         mode="aqi_only"
         mode_label="AQI-based indicator"
         contributors_raw={"AQI":1.0}
@@ -103,7 +103,7 @@ def assess(aqi:int,pollutants:dict,pollutant_sources:dict=None,aqi_source:dict=N
     top=contributors[0]["share"] if contributors else 1.0
     for item in contributors:item["intensity"]=round(min(1.0,item["share"]/top),2) if top else 0.0
     return {
-        "aqi":int(round(aqi_value)),"riskScore":score,"riskLevel":label,"riskLevelKey":key,
+        "aqi":int(round(aqi_value)),"aqiScale":aqi_scale,"riskScore":score,"riskLevel":label,"riskLevelKey":key,
         "riskColor":RISK_COLORS[key],"scoreMode":mode,"scoreModeLabel":mode_label,
         "dataCompleteness":{"available":complete_count,"total":len(HIGH_LEVEL),"percentage":completeness,**source_completeness},
         "pollutantSources":pollutant_sources,"aqiSource":aqi_source or {},
