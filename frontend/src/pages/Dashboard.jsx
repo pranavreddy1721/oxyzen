@@ -66,8 +66,8 @@ export default function Dashboard() {
         payload.monitorLocationCountry = data.monitorLocationCountry || "";
         payload.monitorLocationCountry = data.monitorLocationCountry || "";
       }
-      const { data } = await api.patch("/auth/alerts", payload);
-      updateUser(data.user);
+      const { data: responseData } = await api.patch("/auth/alerts", payload);
+      updateUser(responseData.user);
       setMonitorCoords(null);
       toast.success("Alert preferences saved.");
     } catch (e) { toast.error(formatApiError(e.response?.data?.detail)); }
