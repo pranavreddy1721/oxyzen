@@ -50,8 +50,13 @@ async def _send_transition(db, user, state, snapshot, logger):
 
     # Claim the transition atomically so multiple API instances do not send
     # the same notification at the same time.
+    state_filter = (
+        {"$or": [{"monitorState": "clear"}, {"monitorState": {"$exists": False}}]}
+        if current_state == "clear"
+        else {"monitorState": current_state}
+    )
     result = await db.users.update_one(
-        {"_id": uid, "monitorState": current_state},
+        {"_id": uid, **state_filter},
         {"$set": {"monitorState": state, "lastAlertEvaluatedAt": datetime.now(timezone.utc).isoformat()}},
     )
     if result.modified_count != 1:
