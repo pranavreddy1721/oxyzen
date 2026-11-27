@@ -184,7 +184,8 @@ def _open_meteo_snapshot(loc):
         raise RuntimeError("Open-Meteo did not return a current US AQI reading")
     updated=datetime.fromisoformat(str(stamp).replace("Z","+00:00"))
     if updated.tzinfo is None:
-        updated=updated.replace(tzinfo=timezone.utc)
+        from datetime import timedelta
+        updated=updated.replace(tzinfo=timezone(timedelta(seconds=int(payload.get("utc_offset_seconds",0)))))
     now=datetime.now(timezone.utc)
     age=(now-updated.astimezone(timezone.utc)).total_seconds()
     if age < -900 or age > 10800:
