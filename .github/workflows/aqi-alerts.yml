@@ -9,7 +9,7 @@ on:
     branches:
       - main
   schedule:
-    - cron: "*/15 * * * *"
+    - cron: "*/5 * * * *"
   workflow_dispatch:
 
 permissions:
@@ -65,5 +65,5 @@ jobs:
           BREVO_API_KEY: ${{ secrets.BREVO_API_KEY }}
           BREVO_SENDER_EMAIL: ${{ secrets.BREVO_SENDER_EMAIL }}
           BREVO_SENDER_NAME: ${{ secrets.BREVO_SENDER_NAME }}
-          AQI_ALERT_POLL_SECONDS: "900"
+          AQI_ALERT_POLL_SECONDS: "300"
         run: python alert_worker.py
