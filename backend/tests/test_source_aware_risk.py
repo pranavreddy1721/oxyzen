@@ -1,6 +1,7 @@
 """Unit tests for source-aware pollutant enrichment and risk scoring."""
 import sys
 from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -127,7 +128,7 @@ def test_cpcb_mirror_response_is_normalized_to_primary_india_aqi(monkeypatch):
         def json(self):
             return {"data": [
                 {"station": "Shivaji University, Kolhapur - MPCB", "city": "Kolhapur", "state": "Maharashtra",
-                 "latitude": 16.6870449, "longitude": 74.2505872, "updated": "2026-11-27 16:00",
+                 "latitude": 16.6870449, "longitude": 74.2505872, "updated": datetime.now(ZoneInfo("Asia/Kolkata")).strftime("%Y-%m-%d %H:%M"),
                  "aqi": 80, "category": "Satisfactory", "main_pollutant": "PM10",
                  "pollutants": {"PM10": {"min": 53, "max": 134, "avg": 80},
                                 "PM2.5": {"min": 23, "max": 115, "avg": 71},
