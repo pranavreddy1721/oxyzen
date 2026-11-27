@@ -783,6 +783,33 @@ AI_MODEL_PROVIDER=gemini
 AI_MODEL_NAME=<configured model>
 ```
 
+### AQI email alerts
+
+To enable the optional current-location AQI alert monitor, configure these backend
+environment variables in Render:
+
+```env
+RESEND_API_KEY=<Resend API key>
+ALERT_FROM_EMAIL=<verified sender address>
+AQI_ALERT_POLL_SECONDS=900
+```
+
+The monitor is disabled unless both email variables are configured. Users must
+sign in, enable email alerts, grant browser location permission, select their
+current location, and save the settings. The default AQI threshold is 150 and
+can be customised in the dashboard.
+
+The backend checks opted-in locations every 15 minutes by default. It only
+evaluates readings with a valid WAQI station timestamp no older than two hours.
+It sends an email when AQI crosses the configured threshold and another when
+AQI returns below it; duplicate state transitions are suppressed. The email is
+sent to the user's registered account email address.
+
+The monitor runs as an in-process background task in the FastAPI service. It
+therefore requires the Render web service to remain running; it is not a
+guaranteed scheduler when the hosting service sleeps or restarts. WAQI station
+updates are independent of OXYZEN's polling interval.
+
 Depending on the deployment configuration, the backend can also use:
 
 ```env
