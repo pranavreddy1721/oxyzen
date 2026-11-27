@@ -69,18 +69,18 @@ async def _send_transition(db, user, state, snapshot, logger):
         subject = f"OXYZEN AQI alert: {snapshot['aqi']} at {location}"
         message = (
             f"The latest available AQI reading for {location} is {snapshot['aqi']} "
-            f"({snapshot.get('category', 'Unknown')}), at or above your alert threshold of {threshold}.\\n\\n"
-            f"Monitoring station: {snapshot.get('source', {}).get('station', 'WAQI station')}\\n"
-            f"Station updated: {snapshot.get('providerUpdatedAt')}\\n"
+            f"({snapshot.get('category', 'Unknown')}), at or above your alert threshold of {threshold}.\n\n"
+            f"Monitoring station: {snapshot.get('source', {}).get('station', 'WAQI station')}\n"
+            f"Station updated: {snapshot.get('providerUpdatedAt')}\n"
             "This is an environmental-awareness notification, not medical advice."
         )
     else:
         subject = f"OXYZEN: Air quality recovered at {location}"
         message = (
             f"The latest available AQI reading for {location} is {snapshot['aqi']}, "
-            f"below your alert threshold of {threshold}.\\n\\n"
-            f"Monitoring station: {snapshot.get('source', {}).get('station', 'WAQI station')}\\n"
-            f"Station updated: {snapshot.get('providerUpdatedAt')}\\n"
+            f"below your alert threshold of {threshold}.\n\n"
+            f"Monitoring station: {snapshot.get('source', {}).get('station', 'WAQI station')}\n"
+            f"Station updated: {snapshot.get('providerUpdatedAt')}\n"
             "This is an environmental-awareness notification, not medical advice."
         )
 
