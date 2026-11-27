@@ -35,7 +35,7 @@ export default function AQIScale({ aqi, aqiScale }) {
         )}
       </div>
       <div className="mt-4 grid grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-3 lg:grid-cols-6">
-        {SEGMENTS.map((s) => (
+        {segments.map((s) => (
           <div key={s.label} className="flex items-center gap-2">
             <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: s.color }} />
             <div className="min-w-0">
