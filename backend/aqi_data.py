@@ -40,8 +40,27 @@ def _waqi_json(path,params=None):
  if payload.get("status")!="ok":raise RuntimeError(str(payload.get("data") or "WAQI request failed"))
  return payload.get("data") or {}
 def _has_usable_aqi(data):
- try:return int(str((data or {}).get("aqi")).strip())>=0
- except (TypeError,ValueError):return False
+ raw=(data or {}).get("aqi")
+ try:
+  value=float(str(raw).strip())
+  if value>=0:
+   data["aqi"]=int(round(value))
+   return True
+ except (TypeError,ValueError):
+  pass
+ iaqi=(data or {}).get("iaqi") or {}
+ values=[]
+ for item in iaqi.values():
+  try:
+   value=float((item or {}).get("v"))
+   if value>=0: values.append(value)
+  except (TypeError,ValueError):
+   pass
+ if values:
+  data["aqi"]=int(round(max(values)))
+  data["_aqiDerivedFromPollutantSubindices"]=True
+  return True
+ return False
 def _distance_km(lat1,lon1,lat2,lon2):
  r=6371.0;p1=math.radians(float(lat1));p2=math.radians(float(lat2));dp=math.radians(float(lat2)-float(lat1));dl=math.radians(float(lon2)-float(lon1));a=math.sin(dp/2)**2+math.cos(p1)*math.cos(p2)*math.sin(dl/2)**2;return 2*r*math.asin(math.sqrt(a))
 def _feed_coordinates(data):
@@ -101,7 +120,7 @@ def _source(data):
  city=data.get("city") or {};attrs=data.get("attributions") or [];origin=attrs[0] if attrs else {}
  return {"provider":"World Air Quality Index (WAQI)","providerUrl":"https://waqi.info/","station":city.get("name") or "WAQI station","stationUrl":city.get("url") or "","origin":origin.get("name") or "","originUrl":origin.get("url") or ""}
 def current_snapshot(loc):
- data,distance,slat,slon=_resolve_feed(loc);aqi=max(0,min(500,int(str(data["aqi"]).strip())));sub=_subindices(data);cat=category_for_aqi(aqi);updated=((data.get("time") or {}).get("iso") or (data.get("time") or {}).get("s"));source=_source(data);source.update({"stationLat":slat,"stationLon":slon,"distanceKm":round(distance,1),"matchType":"direct" if distance<=5 else "nearby","dataType":"Direct monitoring station" if distance<=5 else "Nearby/associated monitoring station"});return {"location":{"id":loc["id"],"name":loc["name"],"country":loc.get("country",""),"lat":float(loc["lat"]),"lon":float(loc["lon"])},"aqi":aqi,"category":cat["label"],"categoryKey":cat["key"],"color":cat["color"],"dominantPollutant":data.get("dominentpol"),"pollutants":sub,"pollutantSubIndices":sub,"updatedAt":updated or datetime.now(timezone.utc).isoformat(),"providerUpdatedAt":updated,"source":source}
+ data,distance,slat,slon=_resolve_feed(loc);aqi=max(0,min(500,int(round(float(data["aqi"])))));sub=_subindices(data);cat=category_for_aqi(aqi);updated=((data.get("time") or {}).get("iso") or (data.get("time") or {}).get("s"));source=_source(data);source.update({"stationLat":slat,"stationLon":slon,"distanceKm":round(distance,1),"matchType":"direct" if distance<=5 else "nearby","dataType":"Direct monitoring station" if distance<=5 else "Nearby/associated monitoring station"});return {"location":{"id":loc["id"],"name":loc["name"],"country":loc.get("country",""),"lat":float(loc["lat"]),"lon":float(loc["lon"])},"aqi":aqi,"category":cat["label"],"categoryKey":cat["key"],"color":cat["color"],"dominantPollutant":data.get("dominentpol"),"pollutants":sub,"pollutantSubIndices":sub,"updatedAt":updated or datetime.now(timezone.utc).isoformat(),"providerUpdatedAt":updated,"source":source}
 def history(loc,kind="24h"): return []
 def forecast(loc,days=5):
  try:

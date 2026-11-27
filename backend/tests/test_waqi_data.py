@@ -20,10 +20,34 @@ def test_current_snapshot_uses_waqi(monkeypatch):
     assert snap["source"]["provider"]=="World Air Quality Index (WAQI)"
     assert snap["source"]["origin"]=="CPCB India"
 
-def test_missing_token_fails_without_simulation(monkeypatch):
-    monkeypatch.delenv("WAQI_TOKEN",raising=False)
-    try: aqi_data.current_snapshot(aqi_data.CITIES[2]); assert False
-    except RuntimeError as exc: assert "WAQI_TOKEN" in str(exc)
+def test_missing_token_fails_without_simulation(monkeypatch, caplog):
+    monkeypatch.delenv("WAQI_TOKEN", raising=False)
+    try:
+        aqi_data.current_snapshot(aqi_data.CITIES[2])
+        assert False, "expected a missing WAQI token to prevent a live snapshot"
+    except RuntimeError:
+        # The feed resolver reports the final station-resolution error while
+        # retaining the original missing-token cause in its warning logs.
+        assert "WAQI_TOKEN is not configured" in caplog.text
 
 def test_history_is_not_fabricated():
     assert aqi_data.history(aqi_data.CITIES[2],"24h")==[]
+
+
+def test_decimal_string_aqi_is_normalized(monkeypatch):
+    payload = {
+        "aqi": "23.0",
+        "iaqi": {"pm25": {"v": 23}},
+        "city": {"name": "Test station"},
+        "time": {"iso": "2026-11-27T06:00:00+00:00"},
+    }
+    monkeypatch.setattr(aqi_data, "_resolve_feed", lambda _loc: (payload, 0, 16.7, 74.2))
+    snapshot = aqi_data.current_snapshot(aqi_data.CITIES[2])
+    assert snapshot["aqi"] == 23
+
+
+def test_missing_aggregate_aqi_uses_highest_pollutant_subindex():
+    payload = {"iaqi": {"pm25": {"v": 35.2}, "pm10": {"v": 51.7}}}
+    assert aqi_data._has_usable_aqi(payload) is True
+    assert payload["aqi"] == 52
+    assert payload["_aqiDerivedFromPollutantSubindices"] is True

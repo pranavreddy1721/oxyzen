@@ -206,6 +206,7 @@ OXYZEN is built around four practical goals:
 - Saved locations
 - Dashboard data
 - AQI alert threshold preferences
+- Opt-in current-location AQI email alerts (scheduled worker; 15-minute polling)
 
 </td>
 <td width="50%">
@@ -783,6 +784,34 @@ AI_MODEL_PROVIDER=gemini
 AI_MODEL_NAME=<configured model>
 ```
 
+### AQI email alerts
+
+To enable the optional current-location AQI alert monitor, configure these backend
+environment variables in Render:
+
+```env
+BREVO_API_KEY=<Brevo API key>
+BREVO_SENDER_EMAIL=<verified Brevo sender address>
+BREVO_SENDER_NAME=OXYZEN
+AQI_ALERT_POLL_SECONDS=900
+```
+
+The monitor is disabled unless `BREVO_API_KEY` and `BREVO_SENDER_EMAIL` are configured. Users must
+sign in, enable email alerts, grant browser location permission, select their
+current location, and save the settings. The default AQI threshold is 150 and
+can be customised in the dashboard.
+
+The backend checks opted-in locations every 15 minutes by default. It only
+evaluates readings with a valid WAQI station timestamp no older than two hours.
+It sends an email when AQI crosses the configured threshold and another when
+AQI returns below it; duplicate state transitions are suppressed. The email is
+sent to the user's registered account email address.
+
+The monitor runs as an in-process background task in the FastAPI service. It
+therefore requires the Render web service to remain running; it is not a
+guaranteed scheduler when the hosting service sleeps or restarts. WAQI station
+updates are independent of OXYZEN's polling interval.
+
 Depending on the deployment configuration, the backend can also use:
 
 ```env
@@ -795,6 +824,7 @@ ADMIN_PASSWORD=<admin password>
 
 ```text
 ❌ WAQI_TOKEN
+❌ BREVO_API_KEY
 ❌ MONGO_URL credentials
 ❌ JWT_SECRET
 ❌ EMERGENT_LLM_KEY
@@ -1068,3 +1098,35 @@ SOFTWARE.
 *Built as a full-stack environmental engineering project focused on turning air-quality data into useful, understandable information.*
 
 </div>
+
+
+## Scheduled AQI email alerts
+
+AQI monitoring runs as a one-shot scheduled GitHub Actions job, not inside the web server. This avoids relying on the Render free web service staying awake. The schedule is every 15 minutes; GitHub Actions scheduling can be delayed during periods of high load, so it is a best-effort polling interval rather than a real-time guarantee.
+
+Add these **GitHub Actions repository secrets** (Settings → Secrets and variables → Actions → New repository secret) before enabling the workflow:
+
+- `MONGO_URL` — the same MongoDB connection string used by the Render backend
+- `DB_NAME` — the same database name used by the Render backend
+- `WAQI_TOKEN` — the WAQI API token
+- `BREVO_API_KEY` — the Brevo API key
+- `BREVO_SENDER_EMAIL` — the verified OXYZEN sender email
+- `BREVO_SENDER_NAME` — `OXYZEN`
+
+Never commit these values to the repository. The workflow only reads these secrets at runtime. Monitoring is opt-in per user and skips WAQI readings with missing timestamps, timestamps older than two hours, or timestamps more than five minutes in the future.
+
+
+## Scheduled AQI email alerts
+
+AQI monitoring runs as a one-shot scheduled GitHub Actions job, not inside the web server. This avoids relying on the Render free web service staying awake. The schedule is every 15 minutes; GitHub Actions scheduling can be delayed during periods of high load, so this is a best-effort polling interval rather than a real-time guarantee.
+
+Before enabling the workflow, add these **GitHub Actions repository secrets** under Settings → Secrets and variables → Actions:
+
+- `MONGO_URL` — the MongoDB connection string used by the Render backend
+- `DB_NAME` — the database name used by the Render backend
+- `WAQI_TOKEN` — the WAQI API token
+- `BREVO_API_KEY` — the Brevo API key
+- `BREVO_SENDER_EMAIL` — the verified OXYZEN sender email
+- `BREVO_SENDER_NAME` — `OXYZEN`
+
+Never commit these values to the repository. The workflow reads them only at runtime. Monitoring is opt-in per user and skips WAQI readings with missing timestamps, timestamps older than two hours, or timestamps more than five minutes in the future.
