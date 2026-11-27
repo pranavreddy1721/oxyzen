@@ -823,6 +823,7 @@ ADMIN_PASSWORD=<admin password>
 
 ```text
 ❌ WAQI_TOKEN
+❌ BREVO_API_KEY
 ❌ MONGO_URL credentials
 ❌ JWT_SECRET
 ❌ EMERGENT_LLM_KEY
