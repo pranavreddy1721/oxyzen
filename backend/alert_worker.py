@@ -7,6 +7,11 @@ from datetime import datetime, timezone, timedelta
 import requests
 import aqi_data
 
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(name)s - %(message)s",
+)
+
 POLL_SECONDS = max(60, int(os.environ.get("AQI_ALERT_POLL_SECONDS", "900")))
 MAX_READING_AGE = timedelta(hours=2)
 BREVO_URL = "https://api.brevo.com/v3/smtp/email"
@@ -97,9 +102,11 @@ async def _send_transition(db, user, state, snapshot, logger):
 
 async def check_user(db, user, logger):
     if not user.get("alertsEnabled", True) or not user.get("monitoringEnabled"):
+        logger.info("Skipping user %s: monitoring or email alerts are disabled", str(user.get("_id")))
         return
     lat, lon = user.get("monitorLat"), user.get("monitorLon")
     if lat is None or lon is None:
+        logger.info("Skipping user %s: monitoring coordinates are missing", str(user.get("_id")))
         return
     location = aqi_data.make_custom_location(
         float(lat), float(lon),
@@ -124,6 +131,7 @@ async def check_user(db, user, logger):
 
     threshold = int(user.get("alertThreshold", 150))
     next_state = "above" if int(snapshot["aqi"]) >= threshold else "clear"
+    logger.info("User %s: AQI=%s threshold=%s state=%s", str(user["_id"]), snapshot["aqi"], threshold, next_state)
     await _send_transition(db, user, next_state, snapshot, logger)
 
 
@@ -144,42 +152,6 @@ async def monitor_loop(db, logger):
         except Exception:
             logger.exception("AQI monitor cycle failed")
         await asyncio.sleep(POLL_SECONDS)
-
-
-async def run_once():
-    """Run one scheduled monitoring cycle and exit cleanly."""
-    from motor.motor_asyncio import AsyncIOMotorClient
-
-    mongo_url = os.environ.get("MONGO_URL", "").strip()
-    db_name = os.environ.get("DB_NAME", "").strip()
-    if not mongo_url or not db_name:
-        raise RuntimeError("MONGO_URL and DB_NAME must be configured for the scheduled AQI worker")
-    if not os.environ.get("WAQI_TOKEN", "").strip():
-        raise RuntimeError("WAQI_TOKEN must be configured for the scheduled AQI worker")
-    if not is_email_configured():
-        raise RuntimeError("BREVO_API_KEY and BREVO_SENDER_EMAIL must be configured for the scheduled AQI worker")
-
-    client = AsyncIOMotorClient(mongo_url, serverSelectionTimeoutMS=15000)
-    logger = logging.getLogger("oxyzen.alert_worker")
-    try:
-        db = client[db_name]
-        await db.command("ping")
-        users = await db.users.find({
-            "monitoringEnabled": True,
-            "alertsEnabled": True,
-            "monitorLat": {"$exists": True},
-            "monitorLon": {"$exists": True},
-        }).to_list(1000)
-        logger.info("Scheduled AQI check starting for %s opted-in users", len(users))
-        for user in users:
-            await check_user(db, user, logger)
-        logger.info("Scheduled AQI check completed")
-    finally:
-        client.close()
-
-
-if __name__ == "__main__":
-    asyncio.run(run_once())
 
 
 async def run_once():
