@@ -219,7 +219,7 @@ async def update_alerts(body: AlertPrefInput, user: dict = Depends(get_current_u
     if "enabled" in updates:
         updates["alertsEnabled"] = updates.pop("enabled")
     if "monitoringEnabled" in updates and updates["monitoringEnabled"]:
-        if updates.get("monitorLat") is None:
+        if updates.get("monitorLat", user.get("monitorLat")) is None:
             raise HTTPException(status_code=422, detail="Current location coordinates are required to enable monitoring.")
     if updates:
         updates["updatedAt"] = datetime.now(timezone.utc).isoformat()
