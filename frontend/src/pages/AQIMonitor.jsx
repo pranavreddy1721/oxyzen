@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
-import { Bookmark, BookmarkCheck } from "lucide-react";
+import { Bookmark, BookmarkCheck, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import api, { formatApiError } from "@/lib/api";
 import { useLocation } from "@/context/LocationContext";
@@ -24,12 +24,13 @@ export default function AQIMonitor() {
   const [error, setError] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [saved, setSaved] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
   const load = useCallback(async () => {
     setError(false);
     setErrorMessage("");
-    setCurrent(null);
-    const params = { locationId: location.id, lat: location.lat, lon: location.lon, locationName: location.name, locationCountry: location.country };
+    setRefreshing(true);
+    const params = { locationId: location.id, lat: location.lat, lon: location.lon, locationName: location.name, locationCountry: location.country, _refresh: Date.now() };
     try {
       const [cur, rk, fc] = await Promise.all([
         api.get("/aqi/current", { params }),
@@ -46,10 +47,16 @@ export default function AQIMonitor() {
         `Live WAQI data is currently unavailable for ${location.name}. There may be no nearby WAQI monitoring station available for this location.`
       );
       setError(true);
+    } finally {
+      setRefreshing(false);
     }
   }, [location]);
 
   useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    const timer = window.setInterval(load, 15 * 60 * 1000);
+    return () => window.clearInterval(timer);
+  }, [load]);
 
   useEffect(() => {
     if (!user) { setSaved(false); return; }
@@ -79,10 +86,16 @@ export default function AQIMonitor() {
           <h1 className="font-heading text-3xl font-black tracking-tight sm:text-4xl">AQI Monitor</h1>
           <p className="mt-1 text-muted-foreground">Real-time conditions, pollutant analysis and explainable health risk.</p>
         </div>
-        <Button variant={saved ? "secondary" : "outline"} onClick={saveLocation} data-testid="save-location-btn">
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" onClick={load} disabled={refreshing} data-testid="refresh-aqi-btn">
+            <RefreshCw className={`mr-2 h-4 w-4 ${refreshing ? "animate-spin" : ""}`} strokeWidth={1.5} />
+            {refreshing ? "Refreshing…" : "Refresh data"}
+          </Button>
+          <Button variant={saved ? "secondary" : "outline"} onClick={saveLocation} data-testid="save-location-btn">
           {saved ? <BookmarkCheck className="mr-2 h-4 w-4" strokeWidth={1.5} /> : <Bookmark className="mr-2 h-4 w-4" strokeWidth={1.5} />}
           {saved ? "Saved" : "Save location"}
-        </Button>
+          </Button>
+        </div>
       </div>
 
       <div className="mb-8 max-w-3xl">
