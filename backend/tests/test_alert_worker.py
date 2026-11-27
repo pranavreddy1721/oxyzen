@@ -158,3 +158,46 @@ def test_notification_content_includes_location_and_threshold():
     assert "Delhi" in details["subject"]
     assert "127" in details["message"]
     assert "110" in details["message"]
+
+
+def test_gmail_smtp_sender_uses_app_password_and_authenticated_sender(monkeypatch):
+    import os
+
+    captured = {}
+
+    class FakeSMTP:
+        def __init__(self, host, port, timeout):
+            captured["connection"] = (host, port, timeout)
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return False
+
+        def ehlo(self):
+            captured["ehlo"] = True
+
+        def starttls(self, context):
+            captured["tls"] = context is not None
+
+        def login(self, username, password):
+            captured["login"] = (username, password)
+
+        def send_message(self, message):
+            captured["message"] = message
+
+    monkeypatch.setattr(alert_worker.smtplib, "SMTP", FakeSMTP)
+    monkeypatch.setenv("EMAIL_PROVIDER", "gmail")
+    monkeypatch.setenv("SMTP_USERNAME", "pranavreddy1721@gmail.com")
+    monkeypatch.setenv("SMTP_APP_PASSWORD", "abcd efgh ijkl mnop")
+    monkeypatch.setenv("SMTP_FROM_EMAIL", "pranavreddy1721@gmail.com")
+
+    alert_worker._send_email("recipient@example.com", "OxyZen AQI alert", "Delhi AQI is 152")
+
+    assert captured["connection"] == ("smtp.gmail.com", 587, 20)
+    assert captured["login"] == ("pranavreddy1721@gmail.com", "abcdefghijklmnop")
+    assert captured["tls"] is True
+    assert captured["message"]["To"] == "recipient@example.com"
+    assert captured["message"]["Subject"] == "OxyZen AQI alert"
+    assert "Delhi AQI is 152" in captured["message"].get_content()
