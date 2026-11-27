@@ -110,7 +110,7 @@ export default function AQIMonitor() {
 
           <div className="lg:col-span-12">
             <h2 className="mb-4 font-heading text-xl font-bold">Pollutant Analysis</h2>
-            <PollutantGrid pollutants={current.pollutants} meta={current.pollutantMeta} location={current.location} />
+            <PollutantGrid pollutants={current.pollutants} meta={current.pollutantMeta} location={current.location} sources={current.pollutantDataSources} />
           </div>
 
           <div className="lg:col-span-6"><ActivityGuidance activities={risk?.activityGuidance} aqi={current.aqi} /></div>
