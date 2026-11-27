@@ -391,7 +391,7 @@ def current_snapshot(loc):
         "dataType":"WAQI ground monitoring station",
         "pollutantModelTime":model_time,
     })
-    return {
+    return _attach_cpcb_data({
         "location":{"id":loc["id"],"name":loc["name"],"country":loc.get("country",""),"lat":float(loc["lat"]),"lon":float(loc["lon"])},
         "aqi":aqi,"category":cat["label"],"categoryKey":cat["key"],"color":cat["color"],
         "dominantPollutant":data.get("dominentpol"),
