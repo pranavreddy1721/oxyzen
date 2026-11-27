@@ -12,6 +12,7 @@ import HealthRiskCard from "@/components/HealthRiskCard";
 import ActivityGuidance from "@/components/ActivityGuidance";
 import ExposureContext from "@/components/ExposureContext";
 import ForecastPanel from "@/components/ForecastPanel";
+import OfficialStationData from "@/components/OfficialStationData";
 import { Button } from "@/components/ui/button";
 import { CardSkeleton, ErrorState } from "@/components/states";
 
@@ -107,6 +108,8 @@ export default function AQIMonitor() {
           <div className="lg:col-span-8">
             <AQIScale aqi={current.aqi} />
           </div>
+
+          {current.officialStationData && <div className="lg:col-span-12"><OfficialStationData data={current.officialStationData} /></div>}
 
           <div className="lg:col-span-12">
             <h2 className="mb-4 font-heading text-xl font-bold">Pollutant Analysis</h2>
