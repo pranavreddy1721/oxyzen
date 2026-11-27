@@ -262,6 +262,8 @@ def _resolve_location(location_id: str, lat: Optional[float], lon: Optional[floa
 
 
 async def _log_history(loc: dict, snap: dict, user_id: Optional[str]):
+    if snap.get("aqi") is None:
+        return
     try:
         await db.aqi_records.insert_one({
             "locationId": loc["id"], "locationName": loc["name"],
@@ -314,13 +316,14 @@ async def pollutant_detail(pollutant: str, locationId: str = "", lat: Optional[f
     snap = aqi_data.current_snapshot(loc)
     hist = aqi_data.history(loc, "24h")
     meta = aqi_data.POLLUTANT_META[pollutant]
-    current = snap["pollutants"][pollutant]
-    ratio = current / meta["reference"]
-    if ratio <= 1:
+    current = snap["pollutants"].get(pollutant)
+    if current is None:
+        raise HTTPException(status_code=404, detail="No current pollutant sub-index is available from the selected data sources.")
+    if current <= 50:
         severity = "Good"
-    elif ratio <= 2:
+    elif current <= 100:
         severity = "Moderate"
-    elif ratio <= 3.5:
+    elif current <= 150:
         severity = "High"
     else:
         severity = "Very High"
@@ -329,6 +332,7 @@ async def pollutant_detail(pollutant: str, locationId: str = "", lat: Optional[f
         "current": current,
         "reference": meta["reference"],
         "severity": severity,
+        "source": (snap.get("pollutantDataSources") or {}).get(pollutant, "Unknown source"),
         "trend": [{"label": p["label"], "value": p[pollutant]} for p in hist],
     }
 
@@ -340,7 +344,7 @@ async def pollutant_detail(pollutant: str, locationId: str = "", lat: Optional[f
 async def get_health_risk(request: Request, locationId: str = "", lat: Optional[float] = None, lon: Optional[float] = None, locationName: str = "", locationCountry: str = ""):
     loc = _resolve_location(locationId, lat, lon, locationName, locationCountry)
     snap = aqi_data.current_snapshot(loc)
-    result = health_risk.assess(snap["aqi"], snap["pollutants"])
+    result = health_risk.assess(snap["aqi"], snap["pollutants"], snap.get("pollutantDataSources"), snap.get("source"))
     result["location"] = {k: loc[k] for k in ("id", "name", "country")}
     uid = None
     try:
@@ -418,13 +422,13 @@ async def dashboard(user: dict = Depends(get_current_user)):
     for d in saved:
         loc = aqi_data.find_by_id(d["locationId"]) or aqi_data.make_custom_location(d["lat"], d["lon"], d["name"])
         snap = aqi_data.current_snapshot(loc)
-        risk = health_risk.assess(snap["aqi"], snap["pollutants"])
+        risk = health_risk.assess(snap["aqi"], snap["pollutants"], snap.get("pollutantDataSources"), snap.get("source"))
         locations.append({
             "id": str(d["_id"]), "locationId": d["locationId"], "name": d["name"],
             "label": d.get("label", ""), "country": d.get("country", ""),
             "lat": d["lat"], "lon": d["lon"],
             "aqi": snap["aqi"], "category": snap["category"], "color": snap["color"],
-            "riskLevel": risk["riskLevel"], "riskScore": risk["riskScore"], "riskColor": risk["riskColor"],
+            "riskLevel": risk["riskLevel"], "riskScore": risk["riskScore"], "riskColor": risk["riskColor"],\n            "riskScoreMode": risk.get("scoreMode"), "dataCompleteness": risk.get("dataCompleteness"),
         })
     recent = await db.aqi_records.find({"userId": uid}).sort("createdAt", -1).limit(8).to_list(8)
     recent_out = [{"locationName": r["locationName"], "aqi": r["aqi"], "category": r["category"], "createdAt": r["createdAt"]} for r in recent]

@@ -1,0 +1,27 @@
+name: Backend unit tests
+
+on:
+  pull_request:
+    paths:
+      - "backend/**"
+      - ".github/workflows/backend-unit-tests.yml"
+  push:
+    branches: ["main"]
+    paths:
+      - "backend/**"
+      - ".github/workflows/backend-unit-tests.yml"
+
+jobs:
+  source-aware-risk-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install test dependencies
+        run: python -m pip install --upgrade pip pytest pytest-xdist requests
+      - name: Run source-aware AQI and risk tests
+        env:
+          PYTHONPATH: backend
+        run: pytest -q backend/tests/test_source_aware_risk.py

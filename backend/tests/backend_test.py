@@ -52,8 +52,9 @@ class TestAQI:
         d = r.json()
         assert isinstance(d["aqi"], int) and 0 <= d["aqi"] <= 500
         assert isinstance(d["category"], str) and d["category"]
-        assert set(POLLUTANTS).issubset(d["pollutants"].keys())
+        assert set(d["pollutants"]).issubset(set(POLLUTANTS))
         assert set(POLLUTANTS).issubset(d["pollutantMeta"].keys())
+        assert isinstance(d.get("pollutantDataSources", {}), dict)
         assert isinstance(d["scale"], list) and len(d["scale"]) >= 5
         assert "_id" not in d
 
@@ -99,6 +100,9 @@ class TestAQI:
     @pytest.mark.parametrize("pol", POLLUTANTS)
     def test_pollutant_detail(self, client, pol):
         r = client.get(f"{API}/aqi/pollutant/{pol}", params={"locationId": "delhi"})
+        if r.status_code == 404:
+            assert "No current pollutant sub-index" in r.text
+            return
         assert r.status_code == 200, r.text
         d = r.json()
         assert d["meta"]["reference"] == d["reference"]
@@ -148,15 +152,20 @@ class TestHealthRisk:
         r = client.get(f"{API}/health-risk", params={"locationId": "delhi"})
         assert r.status_code == 200, r.text
         d = r.json()
-        assert d["riskLevel"] in ("LOW", "MODERATE", "ELEVATED", "HIGH", "SEVERE")
-        assert 0 <= d["riskScore"] <= 100
-        assert len(d["mainContributors"]) > 0
-        c = d["mainContributors"][0]
-        assert "label" in c or "name" in c
-        assert isinstance(d["explanation"], str) and len(d["explanation"]) > 10
-        assert len(d["healthImpacts"]) > 0
-        assert len(d["precautions"]) > 0
-        assert d["activityGuidance"]
+        assert d["riskLevel"] in ("LOW", "MODERATE", "ELEVATED", "HIGH", "SEVERE", "INSUFFICIENT DATA")
+        assert d["scoreMode"] in ("pollutant_weighted", "aqi_only", "insufficient")
+        assert isinstance(d["dataCompleteness"]["percentage"], int)
+        if d["riskScore"] is not None:
+            assert 0 <= d["riskScore"] <= 100
+            assert len(d["mainContributors"]) > 0
+            c = d["mainContributors"][0]
+            assert "label" in c or "name" in c
+            assert isinstance(d["explanation"], str) and len(d["explanation"]) > 10
+            assert len(d["healthImpacts"]) > 0
+            assert len(d["precautions"]) > 0
+            assert d["activityGuidance"]
+        else:
+            assert d["riskLevel"] == "INSUFFICIENT DATA"
         assert d["location"]["id"] == "delhi"
 
     def test_low_vs_high_ordering(self, client):
