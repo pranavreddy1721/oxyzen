@@ -344,7 +344,7 @@ async def pollutant_detail(pollutant: str, locationId: str = "", lat: Optional[f
 async def get_health_risk(request: Request, locationId: str = "", lat: Optional[float] = None, lon: Optional[float] = None, locationName: str = "", locationCountry: str = ""):
     loc = _resolve_location(locationId, lat, lon, locationName, locationCountry)
     snap = aqi_data.current_snapshot(loc)
-    result = health_risk.assess(snap["aqi"], snap["pollutants"], snap.get("pollutantDataSources"), snap.get("source"))
+    result = health_risk.assess(snap["aqi"], snap["pollutants"], snap.get("pollutantDataSources"), snap.get("source"), snap.get("aqiScale", "us"))
     result["location"] = {k: loc[k] for k in ("id", "name", "country")}
     uid = None
     try:
