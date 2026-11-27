@@ -340,7 +340,7 @@ async def pollutant_detail(pollutant: str, locationId: str = "", lat: Optional[f
 async def get_health_risk(request: Request, locationId: str = "", lat: Optional[float] = None, lon: Optional[float] = None, locationName: str = "", locationCountry: str = ""):
     loc = _resolve_location(locationId, lat, lon, locationName, locationCountry)
     snap = aqi_data.current_snapshot(loc)
-    result = health_risk.assess(snap["aqi"], snap["pollutants"])
+    result = health_risk.assess(snap["aqi"], snap["pollutants"], snap.get("pollutantDataSources"), snap.get("source"))
     result["location"] = {k: loc[k] for k in ("id", "name", "country")}
     uid = None
     try:
@@ -418,13 +418,13 @@ async def dashboard(user: dict = Depends(get_current_user)):
     for d in saved:
         loc = aqi_data.find_by_id(d["locationId"]) or aqi_data.make_custom_location(d["lat"], d["lon"], d["name"])
         snap = aqi_data.current_snapshot(loc)
-        risk = health_risk.assess(snap["aqi"], snap["pollutants"])
+        risk = health_risk.assess(snap["aqi"], snap["pollutants"], snap.get("pollutantDataSources"), snap.get("source"))
         locations.append({
             "id": str(d["_id"]), "locationId": d["locationId"], "name": d["name"],
             "label": d.get("label", ""), "country": d.get("country", ""),
             "lat": d["lat"], "lon": d["lon"],
             "aqi": snap["aqi"], "category": snap["category"], "color": snap["color"],
-            "riskLevel": risk["riskLevel"], "riskScore": risk["riskScore"], "riskColor": risk["riskColor"],
+            "riskLevel": risk["riskLevel"], "riskScore": risk["riskScore"], "riskColor": risk["riskColor"],\n            "riskScoreMode": risk.get("scoreMode"), "dataCompleteness": risk.get("dataCompleteness"),
         })
     recent = await db.aqi_records.find({"userId": uid}).sort("createdAt", -1).limit(8).to_list(8)
     recent_out = [{"locationName": r["locationName"], "aqi": r["aqi"], "category": r["category"], "createdAt": r["createdAt"]} for r in recent]
