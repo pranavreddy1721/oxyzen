@@ -194,6 +194,7 @@ async def check_user(db, user, logger):
     saved_locations = await db.saved_locations.find({"userId": str(user["_id"])}).to_list(100)
     if not saved_locations:
         logger.info("User %s has no saved locations to monitor", str(user.get("_id")))
+        await _deliver_pending_emails(db, user, logger)
         return
 
     threshold = int(user.get("alertThreshold", 150))
