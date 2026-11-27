@@ -153,10 +153,10 @@ class TestHealthRisk:
         assert r.status_code == 200, r.text
         d = r.json()
         assert d["riskLevel"] in ("LOW", "MODERATE", "ELEVATED", "HIGH", "SEVERE", "INSUFFICIENT DATA")
-        assert 0 <= d["riskScore"] <= 100
         assert d["scoreMode"] in ("pollutant_weighted", "aqi_only", "insufficient")
         assert isinstance(d["dataCompleteness"]["percentage"], int)
         if d["riskScore"] is not None:
+            assert 0 <= d["riskScore"] <= 100
             assert len(d["mainContributors"]) > 0
             c = d["mainContributors"][0]
             assert "label" in c or "name" in c
