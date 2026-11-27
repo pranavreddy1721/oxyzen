@@ -10,6 +10,7 @@ export default function HealthRiskCard({ risk }) {
         <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Environmental Risk Indicator</p>
         <h2 className="mt-2 font-heading text-2xl font-bold">Insufficient data</h2>
         <p className="mt-2 text-sm text-muted-foreground">{risk.explanation}</p>
+        <p className="mt-3 text-xs text-muted-foreground">Pollutant data: {risk.dataCompleteness?.available ?? 0}/{risk.dataCompleteness?.total ?? 6} available ({risk.dataCompleteness?.percentage ?? 0}%).</p>
         <p className="mt-4 text-xs text-muted-foreground">{risk.disclaimer}</p>
       </div>
     );
