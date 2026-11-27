@@ -1,7 +1,7 @@
 import { aqiCategory, textOn } from "@/lib/aqiColors";
 
 export default function AQICard({ aqi, category, color, dominantPollutant, updatedAt, locationName, source }) {
-  const hasAqi = Number.isFinite(Number(aqi));
+  const hasAqi = aqi != null && Number.isFinite(Number(aqi));
   const cat = category ? { label: category, color } : hasAqi ? aqiCategory(aqi) : { label: "Unavailable", color: "#64748B" };
   const c = color || cat.color;
   const pct = hasAqi ? Math.min(100, (Number(aqi) / 500) * 100) : 0;
