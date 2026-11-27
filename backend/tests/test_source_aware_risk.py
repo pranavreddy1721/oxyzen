@@ -131,3 +131,41 @@ def test_cpcb_feed_reports_missing_key_without_request(monkeypatch):
     result = aqi_data.cpcb_station_data({"id": "delhi", "name": "Delhi", "country": "India"})
     assert result["available"] is False
     assert result["stations"] == []
+
+
+def test_cpcb_mirror_response_is_normalized_to_primary_india_aqi(monkeypatch):
+    class FakeResponse:
+        def raise_for_status(self):
+            pass
+        def json(self):
+            return {"data": [
+                {"station": "Shivaji University, Kolhapur - MPCB", "city": "Kolhapur", "state": "Maharashtra",
+                 "latitude": 16.6870449, "longitude": 74.2505872, "updated": "2026-11-27 16:00",
+                 "aqi": 80, "category": "Satisfactory", "main_pollutant": "PM10",
+                 "pollutants": {"PM10": {"min": 53, "max": 134, "avg": 80},
+                                "PM2.5": {"min": 23, "max": 115, "avg": 71},
+                                "NO2": {"min": 15, "max": 100, "avg": 42}}},
+                {"station": "Sinchan Bhavan, Kolhapur - MPCB", "city": "Kolhapur", "state": "Maharashtra",
+                 "latitude": 16.7143745, "longitude": 74.2426398, "updated": "2026-11-27 16:00",
+                 "aqi": 73, "category": "Satisfactory", "main_pollutant": "PM2.5",
+                 "pollutants": {"PM2.5": {"min": 62, "max": 88, "avg": 73}}}
+            ], "meta": {"source": {"attribution": "CPCB monitoring stations"}}}
+    monkeypatch.setattr(aqi_data.requests, "get", lambda *args, **kwargs: FakeResponse())
+    aqi_data._CPCB_CACHE.clear()
+    loc = {"id": "kolhapur", "name": "Kolhapur", "country": "India", "lat": 16.705, "lon": 74.2433}
+    data = aqi_data.cpcb_station_data(loc)
+    snapshot = aqi_data._cpcb_snapshot(loc, data)
+    assert data["available"] is True
+    assert len(data["stations"]) == 2
+    assert snapshot["aqiScale"] == "india_cpcb"
+    assert snapshot["aqi"] in (73, 80)
+    assert snapshot["pollutantDataSources"]["pm25"].startswith("CPCB")
+    assert snapshot["category"] == "Satisfactory"
+
+
+def test_india_cpcb_aqi_uses_national_scale_for_awareness_score():
+    result = health_risk.assess(80, {"pm25": 71, "pm10": 80},
+        {"pm25": "CPCB ground monitoring station sub-index", "pm10": "CPCB ground monitoring station sub-index"},
+        {"provider": "CPCB"}, "india_cpcb")
+    assert result["aqiScale"] == "india_cpcb"
+    assert result["dataCompleteness"]["stationMeasurements"] == 2
