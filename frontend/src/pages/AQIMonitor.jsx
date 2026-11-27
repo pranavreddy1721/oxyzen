@@ -100,20 +100,20 @@ export default function AQIMonitor() {
       ) : (
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
           <div className="lg:col-span-4 lg:row-span-2">
-            <AQICard {...current} locationName={current.location.name} />
+            <AQICard {...current} locationName={current.location.name} aqiScale={current.aqiScale} />
           </div>
           <div className="lg:col-span-8">
             <HealthRiskCard risk={risk} />
           </div>
           <div className="lg:col-span-8">
-            <AQIScale aqi={current.aqi} />
+            <AQIScale aqi={current.aqi} aqiScale={current.aqiScale} />
           </div>
 
           {current.officialStationData && <div className="lg:col-span-12"><OfficialStationData data={current.officialStationData} /></div>}
 
           <div className="lg:col-span-12">
             <h2 className="mb-4 font-heading text-xl font-bold">Pollutant Analysis</h2>
-            <PollutantGrid pollutants={current.pollutants} meta={current.pollutantMeta} location={current.location} sources={current.pollutantDataSources} />
+            <PollutantGrid pollutants={current.pollutants} meta={current.pollutantMeta} location={current.location} sources={current.pollutantDataSources} aqiScale={current.aqiScale} />
           </div>
 
           <div className="lg:col-span-6"><ActivityGuidance activities={risk?.activityGuidance} aqi={current.aqi} /></div>
