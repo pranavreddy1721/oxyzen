@@ -371,40 +371,43 @@ OXYZEN presents live AQI using the following application scale:
 
 The provider value is normalized at runtime and constrained to the application's `0–500` presentation range.
 
-### 🧠 Environmental Health-Risk Score
+### 🧠 Environmental Risk Indicator
 
-The health-risk score is an **OXYZEN awareness indicator**, not a medical diagnosis or clinical assessment.
+OxyZen displays an application-defined **environmental awareness indicator**, not a medical diagnosis or clinical risk prediction.
 
-The configured weighted model uses:
+Data handling:
+- WAQI pollutant AQI sub-indices are preferred and labelled as ground-station measurements.
+- Open-Meteo CAMS pollutant US-AQI sub-indices fill missing WAQI fields only when their hourly timestamp is within 90 minutes of the WAQI reading. These are model estimates, not station measurements.
+- A pollutant-weighted score is used only when at least two pollutant sub-indices are available and at least one is PM2.5 or PM10.
+- If pollutant coverage is insufficient but overall US AQI is available, OxyZen uses an AQI-only indicator. Missing pollutant values are never treated as zero.
+- If no current AQI is available from either source, the indicator reports insufficient data.
 
-```text
-Overall AQI   24%
-PM2.5         34%
-PM10          14%
-O₃            12%
-NO₂            8%
-SO₂            5%
-CO             3%
-```
+The AQI-only indicator maps US AQI bands to the app's 0–100 awareness scale. The pollutant-weighted mode maps each available US-AQI sub-index to that same scale, then applies configured weights across available inputs and renormalizes the included weights.
 
-Risk bands:
+Configured weights:
 
-| Score | Level |
-|---:|---|
-| `0–20` | 🟢 LOW |
-| `21–40` | 🟡 MODERATE |
-| `41–60` | 🟠 ELEVATED |
-| `61–80` | 🔴 HIGH |
-| `81–100` | 🟣 SEVERE |
+| Input | Weight |
+|---|---:|
+| Overall AQI | 24% |
+| PM2.5 | 34% |
+| PM10 | 14% |
+| O₃ | 12% |
+| NO₂ | 8% |
+| SO₂ | 5% |
+| CO | 3% |
 
-### AQI vs Health Risk
+Risk bands: 0–20 LOW, 21–40 MODERATE, 41–60 ELEVATED, 61–80 HIGH, 81–100 SEVERE.
+
+Open-Meteo data is modelled CAMS output and is presented separately from WAQI station observations. Source attribution: [Open-Meteo Air Quality API](https://open-meteo.com/en/docs/air-quality-api).
+
+### AQI vs Environmental Risk Indicator
 
 These values are intentionally different:
 
 | Value | Meaning |
 |---:|---|
 | **23 AQI** | Current air-quality index from the WAQI monitoring feed. |
-| **14 Health Risk** | OXYZEN's calculated environmental health-risk awareness score. |
+| **14 Environmental Risk Indicator** | OXYZEN's calculated environmental awareness score. |
 
 Therefore, an AQI of 23 and a health-risk score of 14 are **not contradictory**.
 
