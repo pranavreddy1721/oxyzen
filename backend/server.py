@@ -428,7 +428,8 @@ async def dashboard(user: dict = Depends(get_current_user)):
             "label": d.get("label", ""), "country": d.get("country", ""),
             "lat": d["lat"], "lon": d["lon"],
             "aqi": snap["aqi"], "category": snap["category"], "color": snap["color"],
-            "riskLevel": risk["riskLevel"], "riskScore": risk["riskScore"], "riskColor": risk["riskColor"],\n            "riskScoreMode": risk.get("scoreMode"), "dataCompleteness": risk.get("dataCompleteness"),
+            "riskLevel": risk["riskLevel"], "riskScore": risk["riskScore"], "riskColor": risk["riskColor"],
+            "riskScoreMode": risk.get("scoreMode"), "dataCompleteness": risk.get("dataCompleteness"),
         })
     recent = await db.aqi_records.find({"userId": uid}).sort("createdAt", -1).limit(8).to_list(8)
     recent_out = [{"locationName": r["locationName"], "aqi": r["aqi"], "category": r["category"], "createdAt": r["createdAt"]} for r in recent]
