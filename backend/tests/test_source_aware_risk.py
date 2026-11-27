@@ -13,7 +13,7 @@ def test_aqi_only_mode_does_not_turn_missing_pollutants_into_zero_risk():
     assert result["scoreMode"] == "aqi_only"
     assert result["riskScore"] == 43
     assert result["riskLevel"] == "ELEVATED"
-    assert result["dataCompleteness"] == {"available": 0, "total": 6, "percentage": 0}
+    assert result["dataCompleteness"] == {"available": 0, "total": 6, "percentage": 0, "stationMeasurements": 0, "modelledEstimates": 0, "unclassified": 0}
     assert result["mainContributors"][0]["name"] == "AQI"
     assert "not treated as zero" in result["explanation"]
 
