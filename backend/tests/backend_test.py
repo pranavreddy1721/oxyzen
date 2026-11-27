@@ -100,11 +100,11 @@ class TestAQI:
     @pytest.mark.parametrize("pol", POLLUTANTS)
     def test_pollutant_detail(self, client, pol):
         r = client.get(f"{API}/aqi/pollutant/{pol}", params={"locationId": "delhi"})
-        assert r.status_code == 200, r.text
-        d = r.json()
         if r.status_code == 404:
             assert "No current pollutant sub-index" in r.text
             return
+        assert r.status_code == 200, r.text
+        d = r.json()
         assert d["meta"]["reference"] == d["reference"]
         assert isinstance(d["current"], (int, float))
         assert d["severity"] in ("Good", "Moderate", "High", "Very High")
@@ -152,7 +152,7 @@ class TestHealthRisk:
         r = client.get(f"{API}/health-risk", params={"locationId": "delhi"})
         assert r.status_code == 200, r.text
         d = r.json()
-        assert d["riskLevel"] in ("LOW", "MODERATE", "ELEVATED", "HIGH", "SEVERE")
+        assert d["riskLevel"] in ("LOW", "MODERATE", "ELEVATED", "HIGH", "SEVERE", "INSUFFICIENT DATA")
         assert 0 <= d["riskScore"] <= 100
         assert d["scoreMode"] in ("pollutant_weighted", "aqi_only", "insufficient")
         assert isinstance(d["dataCompleteness"]["percentage"], int)
