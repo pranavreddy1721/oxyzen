@@ -113,8 +113,13 @@ async def check_user(db, user, logger):
         return
 
     updated = _provider_timestamp(snapshot)
-    if updated is None or datetime.now(timezone.utc) - updated > MAX_READING_AGE:
-        logger.info("Skipping stale/undated WAQI reading for user %s", str(user["_id"]))
+    now = datetime.now(timezone.utc)
+    if (
+        updated is None
+        or now - updated > MAX_READING_AGE
+        or updated - now > timedelta(minutes=5)
+    ):
+        logger.info("Skipping stale, future-dated, or undated WAQI reading for user %s", str(user["_id"]))
         return
 
     threshold = int(user.get("alertThreshold", 150))
