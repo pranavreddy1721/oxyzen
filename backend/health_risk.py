@@ -108,11 +108,35 @@ def assess(aqi:int,pollutants:dict,pollutant_sources:dict=None,aqi_source:dict=N
         "dataCompleteness":{"available":complete_count,"total":len(HIGH_LEVEL),"percentage":completeness,**source_completeness},
         "pollutantSources":pollutant_sources,"aqiSource":aqi_source or {},
         "mainContributors":contributors,"explanation":explanation,
-        "healthImpacts":_impacts(key),"precautions":_precautions(key),
+        "healthImpacts":_cpcb_impacts(aqi_value) if aqi_scale == "india_cpcb" else _impacts(key),
+        "precautions":_cpcb_precautions(aqi_value) if aqi_scale == "india_cpcb" else _precautions(key),
         "activityGuidance":_activities(int(round(aqi_value))),
         "scoreBands":[{"range":"0–20","label":"Low"},{"range":"21–40","label":"Moderate"},{"range":"41–60","label":"Elevated"},{"range":"61–80","label":"High"},{"range":"81–100","label":"Severe"}],
-        "disclaimer":"Environmental Risk Indicator — an application-defined awareness score based on US AQI and available pollutant AQI sub-indices. Modelled estimates are identified separately from station measurements. Not a medical diagnosis or clinical assessment."
+        "disclaimer":"OxyZen Health Impact Indicator — a separate, application-defined 0–100 awareness score based on the selected AQI scale and available pollutant AQI sub-indices. It is not the official CPCB AQI, a medical diagnosis, or a clinical assessment. For India CPCB data, health guidance follows the official CPCB AQI category; the indicator score is shown separately."
     }
+
+def _cpcb_impacts(aqi):
+    """Use CPCB AQI category guidance for Indian readings, not the app score band."""
+    if aqi <= 50:
+        return [{"system":"Respiratory","text":"Good air quality; no significant health impact is expected for most people."},{"system":"Cardiovascular","text":"No additional air-pollution-related concern is indicated for the general population."},{"system":"General","text":"Normal outdoor activities are generally suitable."}]
+    if aqi <= 100:
+        return [{"system":"Respiratory","text":"Most people are unlikely to be affected; unusually sensitive people may experience minor breathing discomfort."},{"system":"Cardiovascular","text":"No specific additional impact is indicated for the general population at this CPCB category."},{"system":"General","text":"Most people can continue normal activities; unusually sensitive individuals should pay attention to symptoms."}]
+    if aqi <= 200:
+        return [{"system":"Respiratory","text":"People with asthma or lung conditions may experience breathing discomfort; sensitive individuals should take care."},{"system":"Cardiovascular","text":"People with heart or lung conditions may experience discomfort with prolonged exposure."},{"system":"General","text":"Consider reducing prolonged or strenuous outdoor exertion if sensitive."}]
+    if aqi <= 300:
+        return [{"system":"Respiratory","text":"Prolonged exposure may cause breathing discomfort for many people; people with lung conditions are at greater risk."},{"system":"Cardiovascular","text":"People with heart conditions should reduce prolonged outdoor exposure."},{"system":"General","text":"Limit prolonged or strenuous outdoor activity."}]
+    if aqi <= 400:
+        return [{"system":"Respiratory","text":"Prolonged exposure may cause respiratory effects for most people, with greater effects for those with lung conditions."},{"system":"Cardiovascular","text":"People with heart conditions should avoid prolonged outdoor exposure."},{"system":"General","text":"Reduce outdoor exposure and follow local public-health advice."}]
+    return [{"system":"Respiratory","text":"Health effects may occur even in healthy people; people with lung conditions are at greater risk."},{"system":"Cardiovascular","text":"People with heart conditions should avoid outdoor exposure where possible."},{"system":"General","text":"Avoid outdoor exertion and follow local public-health advice."}]
+
+
+def _cpcb_precautions(aqi):
+    if aqi <= 50: return ["Normal outdoor activities are generally suitable."]
+    if aqi <= 100: return ["Most people can continue normal activities.","Unusually sensitive individuals should monitor symptoms and reduce prolonged outdoor exertion if discomfort occurs."]
+    if aqi <= 200: return ["Sensitive individuals should limit prolonged or strenuous outdoor exertion.","People with asthma or heart/lung conditions should follow their clinician advice."]
+    if aqi <= 300: return ["Reduce prolonged or strenuous outdoor activity.","People with heart or lung conditions should take extra care."]
+    if aqi <= 400: return ["Avoid prolonged outdoor exertion.","People with respiratory or cardiovascular conditions should minimize exposure."]
+    return ["Avoid outdoor exertion where possible.","Follow local public-health guidance and keep indoor air as clean as practical."]
 
 def _explanation(key,top_names):
     factors=" and ".join(top_names or ["overall air quality"])
