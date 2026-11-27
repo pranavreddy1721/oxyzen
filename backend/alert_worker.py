@@ -94,6 +94,9 @@ def _notification_content(state, location, snapshot, threshold):
 
 async def _deliver_pending_emails(db, user, logger):
     """Retry pending email deliveries without creating duplicate dashboard alerts."""
+    if not is_email_configured():
+        logger.warning("Email provider is not configured; pending dashboard alerts are retained for retry")
+        return
     recipient = (user.get("email") or "").strip()
     if not recipient:
         logger.warning("User %s has no email address; dashboard alerts remain available", str(user["_id"]))
@@ -258,9 +261,6 @@ async def run_once():
         raise RuntimeError("MONGO_URL and DB_NAME must be configured for the scheduled AQI worker")
     if not os.environ.get("WAQI_TOKEN", "").strip():
         raise RuntimeError("WAQI_TOKEN must be configured for the scheduled AQI worker")
-    if not is_email_configured():
-        raise RuntimeError("BREVO_API_KEY and BREVO_SENDER_EMAIL must be configured for the scheduled AQI worker")
-
     client = AsyncIOMotorClient(mongo_url, serverSelectionTimeoutMS=15000)
     logger = logging.getLogger("oxyzen.alert_worker")
     try:
