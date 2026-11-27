@@ -434,7 +434,10 @@ async def dashboard(user: dict = Depends(get_current_user)):
     return {"savedLocations": locations, "recentSearches": recent_out,
             "alertThreshold": user.get("alertThreshold", 150), "alertsEnabled": user.get("alertsEnabled", True),
             "monitoringEnabled": user.get("monitoringEnabled", False),
-            "monitorLocationName": user.get("monitorLocationName", "")}
+            "monitorLocationName": user.get("monitorLocationName", ""),
+            "monitorLocationCountry": user.get("monitorLocationCountry", ""),
+            "monitorLat": user.get("monitorLat"),
+            "monitorLon": user.get("monitorLon")}
 
 
 # ---------------------------------------------------------------------------
