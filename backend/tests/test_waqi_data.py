@@ -1,4 +1,5 @@
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import aqi_data
@@ -9,7 +10,7 @@ class MockResponse:
     def json(self): return self.payload
 
 def sample_payload():
-    return {"status":"ok","data":{"aqi":42,"dominentpol":"pm25","iaqi":{"pm25":{"v":42},"pm10":{"v":30},"o3":{"v":18}},"city":{"name":"Kolhapur","url":"https://aqicn.org/city/kolhapur/","geo":[16.705,74.2433]},"time":{"iso":"2026-09-08T12:00:00+00:00"},"attributions":[{"name":"CPCB India","url":"https://cpcb.nic.in/"}]}}
+    return {"status":"ok","data":{"aqi":42,"dominentpol":"pm25","iaqi":{"pm25":{"v":42},"pm10":{"v":30},"o3":{"v":18}},"city":{"name":"Kolhapur","url":"https://aqicn.org/city/kolhapur/","geo":[16.705,74.2433]},"time":{"iso":datetime.now(timezone.utc).isoformat()},"attributions":[{"name":"CPCB India","url":"https://cpcb.nic.in/"}]}}
 
 def test_current_snapshot_uses_waqi(monkeypatch):
     monkeypatch.setenv("WAQI_TOKEN","test-token")
