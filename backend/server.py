@@ -275,12 +275,42 @@ async def _log_history(loc: dict, snap: dict, user_id: Optional[str]):
         logger.warning(f"history log failed: {e}")
 
 
+CPCB_AQI_CATEGORIES = [
+    {"min": 0, "max": 50, "label": "Good", "key": "good", "color": "#10B981"},
+    {"min": 51, "max": 100, "label": "Satisfactory", "key": "satisfactory", "color": "#84CC16"},
+    {"min": 101, "max": 200, "label": "Moderate", "key": "moderate", "color": "#F59E0B"},
+    {"min": 201, "max": 300, "label": "Poor", "key": "poor", "color": "#F97316"},
+    {"min": 301, "max": 400, "label": "Very Poor", "key": "very poor", "color": "#EF4444"},
+    {"min": 401, "max": 500, "label": "Severe", "key": "severe", "color": "#7F1D1D"},
+]
+
+
+def _pollutant_meta_for_snapshot(snap: dict) -> dict:
+    metadata = {key: dict(value) for key, value in aqi_data.POLLUTANT_META.items()}
+    sources = snap.get("pollutantDataSources") or {}
+    for key, item in metadata.items():
+        source = sources.get(key) or (snap.get("source") or {}).get("provider", "")
+        if "CPCB" in source:
+            item["short"] = f"CPCB station AQI sub-index for {item['full_name']} (via third-party mirror)."
+            item["what"] = "This is a CPCB ground-station AQI sub-index relayed through a third-party API mirror, not a pollutant concentration measurement."
+        elif "WAQI" in source:
+            item["short"] = f"WAQI monitoring-station AQI sub-index for {item['full_name']}."
+            item["what"] = "This is a WAQI station AQI sub-index, not a pollutant concentration measurement."
+        elif "Open-Meteo" in source:
+            item["short"] = f"Open-Meteo CAMS modelled US-AQI sub-index for {item['full_name']}."
+            item["what"] = "This is a modelled US-AQI pollutant sub-index from Open-Meteo CAMS, not a ground-station observation or pollutant concentration measurement."
+        else:
+            item["short"] = f"AQI sub-index for {item['full_name']} from the selected data source."
+            item["what"] = "This is an AQI sub-index from the selected data source, not necessarily a pollutant concentration measurement."
+    return metadata
+
+
 @api.get("/aqi/current")
 async def aqi_current(request: Request, locationId: str = "", lat: Optional[float] = None, lon: Optional[float] = None, locationName: str = "", locationCountry: str = ""):
     loc = _resolve_location(locationId, lat, lon, locationName, locationCountry)
     snap = aqi_data.current_snapshot(loc)
-    snap["scale"] = aqi_data.AQI_CATEGORIES
-    snap["pollutantMeta"] = aqi_data.POLLUTANT_META
+    snap["scale"] = CPCB_AQI_CATEGORIES if snap.get("aqiScale") == "india_cpcb" else aqi_data.AQI_CATEGORIES
+    snap["pollutantMeta"] = _pollutant_meta_for_snapshot(snap)
     uid = None
     try:
         u = await get_current_user(request)
@@ -315,7 +345,7 @@ async def pollutant_detail(pollutant: str, locationId: str = "", lat: Optional[f
     loc = _resolve_location(locationId, lat, lon, locationName, locationCountry)
     snap = aqi_data.current_snapshot(loc)
     hist = aqi_data.history(loc, "24h")
-    meta = aqi_data.POLLUTANT_META[pollutant]
+    meta = _pollutant_meta_for_snapshot(snap)[pollutant]
     current = snap["pollutants"].get(pollutant)
     if current is None:
         raise HTTPException(status_code=404, detail="No current pollutant sub-index is available from the selected data sources.")
