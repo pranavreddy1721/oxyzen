@@ -105,7 +105,7 @@ def assess(aqi:int,pollutants:dict,pollutant_sources:dict=None,aqi_source:dict=N
     return {
         "aqi":int(round(aqi_value)),"riskScore":score,"riskLevel":label,"riskLevelKey":key,
         "riskColor":RISK_COLORS[key],"scoreMode":mode,"scoreModeLabel":mode_label,
-        "dataCompleteness":{"available":complete_count,"total":len(HIGH_LEVEL),"percentage":completeness},
+        "dataCompleteness":{"available":complete_count,"total":len(HIGH_LEVEL),"percentage":completeness,**source_completeness},
         "pollutantSources":pollutant_sources,"aqiSource":aqi_source or {},
         "mainContributors":contributors,"explanation":explanation,
         "healthImpacts":_impacts(key),"precautions":_precautions(key),
