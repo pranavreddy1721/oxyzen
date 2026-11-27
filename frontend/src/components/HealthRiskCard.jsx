@@ -7,7 +7,7 @@ export default function HealthRiskCard({ risk }) {
   if (risk.scoreMode === "insufficient" || risk.riskScore == null) {
     return (
       <div className="rounded-xl border border-border bg-card p-8" data-testid="health-risk-card">
-        <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Environmental Risk Indicator</p>
+        <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">OxyZen Health Impact Indicator</p>
         <h2 className="mt-2 font-heading text-2xl font-bold">Insufficient data</h2>
         <p className="mt-2 text-sm text-muted-foreground">{risk.explanation}</p>
         <div className="mt-3 space-y-1 text-xs text-muted-foreground">
@@ -23,10 +23,14 @@ export default function HealthRiskCard({ risk }) {
   const sourceValues = Object.values(risk.pollutantSources || {});
   const hasWaqi = sourceValues.some((value) => value.includes("WAQI"));
   const hasModel = sourceValues.some((value) => value.includes("Open-Meteo"));
-  const sourceLabel = hasWaqi && hasModel ? "WAQI station + Open-Meteo model"
+  const hasCpcb = sourceValues.some((value) => value.includes("CPCB"));
+  const sourceLabel = hasCpcb && hasWaqi ? "CPCB + WAQI station measurements"
+    : hasCpcb && hasModel ? "CPCB station + Open-Meteo model"
+    : hasCpcb ? "CPCB station measurements"
+    : hasWaqi && hasModel ? "WAQI station + Open-Meteo model"
     : hasWaqi ? "WAQI station measurements"
     : hasModel ? "Open-Meteo model estimates"
-    : "Overall US AQI only";
+    : "AQI-based estimate";
 
   return (
     <div className="rounded-xl border border-border bg-card p-8" data-testid="health-risk-card">
@@ -48,9 +52,9 @@ export default function HealthRiskCard({ risk }) {
             </div>
           </div>
           <div>
-            <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Environmental Risk Indicator</p>
+            <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">OxyZen Health Impact Indicator</p>
             <p className="mt-1 font-heading text-3xl font-black tracking-tight" style={{ color: c }} data-testid="risk-level">{risk.riskLevel}</p>
-            <p className="mt-1 text-xs text-muted-foreground">{risk.scoreModeLabel || "Environmental Risk Indicator"}</p>
+            <p className="mt-1 text-xs text-muted-foreground">{risk.scoreModeLabel || "OxyZen Health Impact Indicator"}</p>
           </div>
         </div>
 
@@ -88,11 +92,12 @@ export default function HealthRiskCard({ risk }) {
           </div>
           {risk.scoreMode === "aqi_only" && (
             <p className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-xs text-muted-foreground">
-              Pollutant-specific readings were insufficient. This score is mapped from overall US AQI only; missing pollutants are not counted as zero.
+              Pollutant-specific readings were insufficient. This score is mapped from the available overall AQI only; missing pollutants are not counted as zero.
             </p>
           )}
           {risk.scoreMode === "pollutant_weighted" && (
             <div className="flex flex-wrap gap-2 text-[11px] text-muted-foreground" data-testid="risk-source-legend">
+              {hasCpcb && <span className="rounded-full border border-border px-2 py-1">CPCB = ground-station measurement (via mirror)</span>}
               {hasWaqi && <span className="rounded-full border border-border px-2 py-1">WAQI = station measurement</span>}
               {hasModel && <span className="rounded-full border border-border px-2 py-1">Open-Meteo = model estimate</span>}
             </div>
