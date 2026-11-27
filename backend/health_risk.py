@@ -32,6 +32,26 @@ def _aqi_only_score(aqi):
             return int(round(y0+(value-x0)*(y1-y0)/(x1-x0)))
     return 100
 
+def _source_completeness(available, pollutant_sources):
+    """Count provenance only for pollutant values that are actually available."""
+    measured = 0
+    modelled = 0
+    unclassified = 0
+    for key in available:
+        source = str(pollutant_sources.get(key, "")).lower()
+        if "waqi" in source or "station" in source:
+            measured += 1
+        elif "open-meteo" in source or "cams" in source or "model" in source:
+            modelled += 1
+        else:
+            unclassified += 1
+    return {
+        "stationMeasurements": measured,
+        "modelledEstimates": modelled,
+        "unclassified": unclassified,
+    }
+
+
 def assess(aqi:int,pollutants:dict,pollutant_sources:dict=None,aqi_source:dict=None)->dict:
     pollutants=pollutants or {}
     pollutant_sources=pollutant_sources or {}
@@ -40,12 +60,13 @@ def assess(aqi:int,pollutants:dict,pollutant_sources:dict=None,aqi_source:dict=N
     has_particulate=any(k in available for k in ("pm25","pm10"))
     complete_count=len(available)
     completeness=round(complete_count/len(HIGH_LEVEL)*100)
+    source_completeness=_source_completeness(available, pollutant_sources)
     sufficient=complete_count>=2 and has_particulate
     if aqi is None:
         return {
             "aqi":None,"riskScore":None,"riskLevel":"INSUFFICIENT DATA","riskLevelKey":"insufficient",
             "riskColor":"#64748B","scoreMode":"insufficient","scoreModeLabel":"Insufficient data",
-            "dataCompleteness":{"available":complete_count,"total":len(HIGH_LEVEL),"percentage":completeness},
+            "dataCompleteness":{"available":complete_count,"total":len(HIGH_LEVEL),"percentage":completeness,**source_completeness},
             "pollutantSources":pollutant_sources,"mainContributors":[],
             "explanation":"A current AQI reading is unavailable, so OxyZen cannot calculate an environmental risk indicator.",
             "healthImpacts":[],"precautions":["Try again when a fresh AQI or pollutant reading is available."],
