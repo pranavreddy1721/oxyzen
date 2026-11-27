@@ -789,12 +789,13 @@ To enable the optional current-location AQI alert monitor, configure these backe
 environment variables in Render:
 
 ```env
-RESEND_API_KEY=<Resend API key>
-ALERT_FROM_EMAIL=<verified sender address>
+BREVO_API_KEY=<Brevo API key>
+BREVO_SENDER_EMAIL=<verified Brevo sender address>
+BREVO_SENDER_NAME=OXYZEN
 AQI_ALERT_POLL_SECONDS=900
 ```
 
-The monitor is disabled unless both email variables are configured. Users must
+The monitor is disabled unless `BREVO_API_KEY` and `BREVO_SENDER_EMAIL` are configured. Users must
 sign in, enable email alerts, grant browser location permission, select their
 current location, and save the settings. The default AQI threshold is 150 and
 can be customised in the dashboard.
