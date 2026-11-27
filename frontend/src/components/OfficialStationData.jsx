@@ -16,7 +16,7 @@ export default function OfficialStationData({ data }) {
         <div>
           <p className="text-xs font-semibold uppercase tracking-widest text-emerald-600">Government monitoring network</p>
           <h2 className="mt-1 font-heading text-xl font-bold">Official CPCB station observations</h2>
-          <p className="mt-1 text-sm text-muted-foreground">Raw station pollutant averages from CPCB via data.gov.in. These are not converted into National AQI here.</p>
+          <p className="mt-1 text-sm text-muted-foreground">CPCB station AQI and pollutant sub-indices relayed through a third-party API mirror.</p>
         </div>
         <a href={data.providerUrl || "https://data.gov.in/resource/real-time-air-quality-index-various-locations"} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs text-emerald-600 hover:underline">
           Source dataset <ExternalLink className="h-3 w-3" />
@@ -54,7 +54,7 @@ export default function OfficialStationData({ data }) {
               {expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
             </button>
           )}
-          <p className="mt-3 text-[11px] text-muted-foreground">Station observations may be incomplete or delayed. CPCB's National AQI requires prescribed rolling averages and minimum pollutant coverage; a single hourly concentration snapshot is not enough to calculate it reliably.</p>
+          <p className="mt-3 text-[11px] text-muted-foreground">Station observations may be incomplete or delayed. Station readings can be incomplete or delayed. Data is attributed to CPCB and relayed by a third-party API mirror.</p>
         </>
       )}
     </section>
