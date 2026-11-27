@@ -206,6 +206,7 @@ OXYZEN is built around four practical goals:
 - Saved locations
 - Dashboard data
 - AQI alert threshold preferences
+- Opt-in current-location AQI email alerts (scheduled worker; 15-minute polling)
 
 </td>
 <td width="50%">
@@ -1097,3 +1098,19 @@ SOFTWARE.
 *Built as a full-stack environmental engineering project focused on turning air-quality data into useful, understandable information.*
 
 </div>
+
+
+## Scheduled AQI email alerts
+
+AQI monitoring runs as a one-shot scheduled GitHub Actions job, not inside the web server. This avoids relying on the Render free web service staying awake. The schedule is every 15 minutes; GitHub Actions scheduling can be delayed during periods of high load, so it is a best-effort polling interval rather than a real-time guarantee.
+
+Add these **GitHub Actions repository secrets** (Settings → Secrets and variables → Actions → New repository secret) before enabling the workflow:
+
+- `MONGO_URL` — the same MongoDB connection string used by the Render backend
+- `DB_NAME` — the same database name used by the Render backend
+- `WAQI_TOKEN` — the WAQI API token
+- `BREVO_API_KEY` — the Brevo API key
+- `BREVO_SENDER_EMAIL` — the verified OXYZEN sender email
+- `BREVO_SENDER_NAME` — `OXYZEN`
+
+Never commit these values to the repository. The workflow only reads these secrets at runtime. Monitoring is opt-in per user and skips WAQI readings with missing timestamps, timestamps older than two hours, or timestamps more than five minutes in the future.
