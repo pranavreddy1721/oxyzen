@@ -1,4 +1,5 @@
 name: OXYZEN AQI email alerts
+# Scheduled background checks run independently of dashboard sessions.
 
 on:
   push:
