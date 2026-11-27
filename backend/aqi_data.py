@@ -90,9 +90,14 @@ def _resolve_feed(loc):
  now=datetime.now(timezone.utc)
  def fresh(result, station_label):
   if not result:return False
-  updated=_provider_time(result[0])
-  if updated is None:
+  updated_raw=_provider_time(result[0])
+  if updated_raw is None:
    logger.warning("Skipping WAQI station %s: timestamp missing or invalid",station_label)
+   return False
+  try:
+   updated=datetime.fromisoformat(updated_raw.replace("Z","+00:00"))
+  except (TypeError,ValueError):
+   logger.warning("Skipping WAQI station %s: normalized timestamp is invalid: %r",station_label,updated_raw)
    return False
   age=(now-updated).total_seconds()
   if age < -300 or age > 7200:
