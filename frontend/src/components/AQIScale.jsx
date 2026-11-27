@@ -7,17 +7,26 @@ const SEGMENTS = [
   { label: "Hazardous", range: "301+", color: "#9F1239", max: 500 },
 ];
 
-export default function AQIScale({ aqi }) {
+export default function AQIScale({ aqi, aqiScale }) {
+  const cpcb = aqiScale === "india_cpcb";
+  const segments = cpcb ? [
+    { label: "Good", range: "0–50", color: "#10B981" },
+    { label: "Satisfactory", range: "51–100", color: "#84CC16" },
+    { label: "Moderate", range: "101–200", color: "#F59E0B" },
+    { label: "Poor", range: "201–300", color: "#F97316" },
+    { label: "Very Poor", range: "301–400", color: "#EF4444" },
+    { label: "Severe", range: "401–500", color: "#7F1D1D" },
+  ] : SEGMENTS;
   const pos = Math.min(100, (Math.min(aqi, 500) / 500) * 100);
   return (
     <div className="rounded-xl border border-border bg-card p-6" data-testid="aqi-scale">
       <div className="mb-4 flex items-center justify-between">
-        <h3 className="text-sm font-semibold uppercase tracking-widest text-muted-foreground">AQI Scale</h3>
+        <h3 className="text-sm font-semibold uppercase tracking-widest text-muted-foreground">{cpcb ? "CPCB National AQI Scale" : "US AQI Scale"}</h3>
         {aqi != null && <span className="font-data text-xs text-muted-foreground">Current: {aqi}</span>}
       </div>
       <div className="relative">
         <div className="flex h-3 overflow-hidden rounded-full">
-          {SEGMENTS.map((s) => (
+          {segments.map((s) => (
             <div key={s.label} className="flex-1" style={{ background: s.color }} />
           ))}
         </div>
