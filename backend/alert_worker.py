@@ -144,3 +144,39 @@ async def monitor_loop(db, logger):
         except Exception:
             logger.exception("AQI monitor cycle failed")
         await asyncio.sleep(POLL_SECONDS)
+
+
+async def run_once():
+    """Run one scheduled monitoring cycle and exit cleanly."""
+    from motor.motor_asyncio import AsyncIOMotorClient
+
+    mongo_url = os.environ.get("MONGO_URL", "").strip()
+    db_name = os.environ.get("DB_NAME", "").strip()
+    if not mongo_url or not db_name:
+        raise RuntimeError("MONGO_URL and DB_NAME must be configured for the scheduled AQI worker")
+    if not os.environ.get("WAQI_TOKEN", "").strip():
+        raise RuntimeError("WAQI_TOKEN must be configured for the scheduled AQI worker")
+    if not is_email_configured():
+        raise RuntimeError("BREVO_API_KEY and BREVO_SENDER_EMAIL must be configured for the scheduled AQI worker")
+
+    client = AsyncIOMotorClient(mongo_url, serverSelectionTimeoutMS=15000)
+    logger = logging.getLogger("oxyzen.alert_worker")
+    try:
+        db = client[db_name]
+        await db.command("ping")
+        users = await db.users.find({
+            "monitoringEnabled": True,
+            "alertsEnabled": True,
+            "monitorLat": {"$exists": True},
+            "monitorLon": {"$exists": True},
+        }).to_list(1000)
+        logger.info("Scheduled AQI check starting for %s opted-in users", len(users))
+        for user in users:
+            await check_user(db, user, logger)
+        logger.info("Scheduled AQI check completed")
+    finally:
+        client.close()
+
+
+if __name__ == "__main__":
+    asyncio.run(run_once())
