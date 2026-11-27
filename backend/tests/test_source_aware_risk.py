@@ -99,3 +99,35 @@ def test_unknown_source_is_not_mislabelled_as_station_or_model():
     assert result["dataCompleteness"]["stationMeasurements"] == 0
     assert result["dataCompleteness"]["modelledEstimates"] == 0
     assert result["dataCompleteness"]["unclassified"] == 2
+
+
+def test_cpcb_station_feed_groups_raw_observations_without_claiming_national_aqi(monkeypatch):
+    class FakeResponse:
+        def raise_for_status(self):
+            pass
+
+        def json(self):
+            return {"records": [
+                {"station": "Station A", "city": "Delhi", "state": "Delhi", "pollutant_id": "PM2.5",
+                 "avg_value": "72", "min_value": "60", "max_value": "80", "last_update": "27-11-2026 12:00:00",
+                 "latitude": "28.6", "longitude": "77.2", "unit": "ug/m3"},
+                {"station": "Station A", "city": "Delhi", "state": "Delhi", "pollutant_id": "PM10",
+                 "avg_value": "110", "min_value": "90", "max_value": "120", "last_update": "27-11-2026 12:00:00",
+                 "latitude": "28.6", "longitude": "77.2", "unit": "ug/m3"},
+            ]}
+
+    monkeypatch.setenv("DATA_GOV_IN_API_KEY", "test-key")
+    monkeypatch.setattr(aqi_data.requests, "get", lambda *args, **kwargs: FakeResponse())
+    aqi_data._CPCB_CACHE.clear()
+    result = aqi_data.cpcb_station_data({"id": "delhi", "name": "Delhi", "country": "India"})
+    assert result["available"] is True
+    assert len(result["stations"]) == 1
+    assert result["stations"][0]["pollutants"]["PM2.5"]["average"] == 72
+    assert "not a computed National AQI" in result["dataType"]
+
+
+def test_cpcb_feed_reports_missing_key_without_request(monkeypatch):
+    monkeypatch.delenv("DATA_GOV_IN_API_KEY", raising=False)
+    result = aqi_data.cpcb_station_data({"id": "delhi", "name": "Delhi", "country": "India"})
+    assert result["available"] is False
+    assert result["stations"] == []
