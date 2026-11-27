@@ -21,15 +21,16 @@ def test_current_snapshot_uses_waqi(monkeypatch):
     assert snap["source"]["provider"]=="World Air Quality Index (WAQI)"
     assert snap["source"]["origin"]=="CPCB India"
 
-def test_missing_token_fails_without_simulation(monkeypatch, caplog):
+def test_missing_token_uses_model_fallback_or_reports_unavailable(monkeypatch, caplog):
     monkeypatch.delenv("WAQI_TOKEN", raising=False)
-    try:
-        aqi_data.current_snapshot(aqi_data.CITIES[2])
-        assert False, "expected a missing WAQI token to prevent a live snapshot"
-    except RuntimeError:
-        # The feed resolver reports the final station-resolution error while
-        # retaining the original missing-token cause in its warning logs.
-        assert "WAQI_TOKEN is not configured" in caplog.text
+    def no_model_data(_loc):
+        raise RuntimeError("Open-Meteo test fixture has no current AQI")
+    monkeypatch.setattr(aqi_data, "_open_meteo_snapshot", no_model_data)
+    snap = aqi_data.current_snapshot(aqi_data.CITIES[2])
+    assert snap["aqi"] is None
+    assert snap["category"] == "Unavailable"
+    assert snap["source"]["provider"] == "Unavailable"
+    assert "WAQI_TOKEN is not configured" in caplog.text
 
 def test_history_is_not_fabricated():
     assert aqi_data.history(aqi_data.CITIES[2],"24h")==[]
