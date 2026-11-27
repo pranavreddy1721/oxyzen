@@ -4,19 +4,33 @@ import api from "@/lib/api";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Spinner } from "@/components/states";
 
-const SEV = { Good: "#10B981", Moderate: "#F59E0B", High: "#F97316", "Very High": "#EF4444" };
-function severity(value) { if (value == null || !Number.isFinite(Number(value))) return "Unavailable"; if (value <= 50) return "Good"; if (value <= 100) return "Moderate"; if (value <= 150) return "High"; return "Very High"; }
+const SEV = { Good: "#10B981", Satisfactory: "#84CC16", Moderate: "#F59E0B", Poor: "#F97316", "Very Poor": "#EF4444", Severe: "#7F1D1D", High: "#F97316", "Very High": "#EF4444" };
+function severity(value, aqiScale) {
+  if (value == null || !Number.isFinite(Number(value))) return "Unavailable";
+  if (aqiScale === "india_cpcb") {
+    if (value <= 50) return "Good";
+    if (value <= 100) return "Satisfactory";
+    if (value <= 200) return "Moderate";
+    if (value <= 300) return "Poor";
+    if (value <= 400) return "Very Poor";
+    return "Severe";
+  }
+  if (value <= 50) return "Good";
+  if (value <= 100) return "Moderate";
+  if (value <= 150) return "High";
+  return "Very High";
+}
 
-export default function PollutantGrid({ pollutants, meta, location, sources = {} }) {
+export default function PollutantGrid({ pollutants, meta, location, sources = {}, aqiScale = "us" }) {
   const [active, setActive] = useState(null); const [detail, setDetail] = useState(null); const [loading, setLoading] = useState(false);
   const openDetail = async (key) => { setActive(key); setDetail(null); setLoading(true); try { const { data } = await api.get(`/aqi/pollutant/${key}`, { params: { locationId: location?.id, lat: location?.lat, lon: location?.lon, locationName: location?.name, locationCountry: location?.country } }); setDetail(data); } catch { setDetail(null); } finally { setLoading(false); } };
   const keys = ["pm25", "pm10", "o3", "no2", "so2", "co"];
   return <>
     <div className="grid grid-cols-2 gap-4 md:grid-cols-3" data-testid="pollutant-grid">
-      {keys.map((k) => { const m = meta[k]; const value = pollutants?.[k]; const available = value != null && Number.isFinite(Number(value)); const sev = severity(value); const color = SEV[sev] || "#64748B"; const source = sources[k] || ""; return <button key={k} onClick={() => available && openDetail(k)} disabled={!available} data-testid={`pollutant-card-${k}`} className="group flex flex-col items-start rounded-xl border border-border bg-card p-5 text-left transition-transform enabled:hover:-translate-y-1 enabled:hover:border-primary disabled:cursor-not-allowed disabled:opacity-60">
+      {keys.map((k) => { const m = meta[k]; const value = pollutants?.[k]; const available = value != null && Number.isFinite(Number(value)); const sev = severity(value, aqiScale); const color = SEV[sev] || "#64748B"; const source = sources[k] || ""; return <button key={k} onClick={() => available && openDetail(k)} disabled={!available} data-testid={`pollutant-card-${k}`} className="group flex flex-col items-start rounded-xl border border-border bg-card p-5 text-left transition-transform enabled:hover:-translate-y-1 enabled:hover:border-primary disabled:cursor-not-allowed disabled:opacity-60">
         <div className="flex w-full items-center justify-between"><span className="font-heading text-lg font-bold">{m.name}</span><span className="h-2.5 w-2.5 rounded-full" style={{ background: color }} /></div>
         <div className="mt-3 flex items-baseline gap-1"><span className="font-data text-2xl font-bold" style={{ color }}>{available ? value : "Unavailable"}</span><span className="text-xs text-muted-foreground">AQI sub-index</span></div>
-        <span className="mt-1 text-xs font-semibold" style={{ color }}>{sev}</span>{source && <span className="mt-1 text-[10px] text-muted-foreground">{source.includes("WAQI") ? "WAQI station measurement" : "Open-Meteo model estimate"}</span>}<p className="mt-2 line-clamp-2 text-xs text-muted-foreground">{m.short}</p>
+        <span className="mt-1 text-xs font-semibold" style={{ color }}>{sev}</span>{source && <span className="mt-1 text-[10px] text-muted-foreground">{source.includes("CPCB") ? "CPCB station sub-index · third-party mirror" : source.includes("WAQI") ? "WAQI station sub-index" : source.includes("Open-Meteo") ? "Open-Meteo model estimate" : source}</span>}<p className="mt-2 line-clamp-2 text-xs text-muted-foreground">{m.short}</p>
       </button>; })}
     </div>
     <Dialog open={!!active} onOpenChange={(o) => !o && setActive(null)}><DialogContent className="max-w-lg" data-testid="pollutant-modal">{active && <><DialogHeader><DialogTitle className="font-heading text-2xl">{meta[active].name} · <span className="text-base font-normal text-muted-foreground">{meta[active].full_name}</span></DialogTitle></DialogHeader>}{loading && <div className="flex justify-center py-10"><Spinner /></div>}{detail && <div className="space-y-5 pt-1">
