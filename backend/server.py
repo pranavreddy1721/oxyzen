@@ -262,6 +262,8 @@ def _resolve_location(location_id: str, lat: Optional[float], lon: Optional[floa
 
 
 async def _log_history(loc: dict, snap: dict, user_id: Optional[str]):
+    if snap.get("aqi") is None:
+        return
     try:
         await db.aqi_records.insert_one({
             "locationId": loc["id"], "locationName": loc["name"],
@@ -314,7 +316,9 @@ async def pollutant_detail(pollutant: str, locationId: str = "", lat: Optional[f
     snap = aqi_data.current_snapshot(loc)
     hist = aqi_data.history(loc, "24h")
     meta = aqi_data.POLLUTANT_META[pollutant]
-    current = snap["pollutants"][pollutant]
+    current = snap["pollutants"].get(pollutant)
+    if current is None:
+        raise HTTPException(status_code=404, detail="No current pollutant sub-index is available from the selected data sources.")
     ratio = current / meta["reference"]
     if ratio <= 1:
         severity = "Good"
@@ -329,6 +333,7 @@ async def pollutant_detail(pollutant: str, locationId: str = "", lat: Optional[f
         "current": current,
         "reference": meta["reference"],
         "severity": severity,
+        "source": (snap.get("pollutantDataSources") or {}).get(pollutant, "Unknown source"),
         "trend": [{"label": p["label"], "value": p[pollutant]} for p in hist],
     }
 
