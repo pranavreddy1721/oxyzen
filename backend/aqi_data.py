@@ -273,8 +273,6 @@ def current_snapshot(loc):
     try:
         data,distance,slat,slon=_resolve_feed(loc)
     except Exception as exc:
-        if not os.environ.get("WAQI_TOKEN","").strip():
-            raise
         logger.warning("No fresh WAQI station for %s; trying Open-Meteo current AQI and pollutant fallback: %s",loc.get("name"),exc)
         return _open_meteo_snapshot(loc)
 
