@@ -10,7 +10,11 @@ export default function HealthRiskCard({ risk }) {
         <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Environmental Risk Indicator</p>
         <h2 className="mt-2 font-heading text-2xl font-bold">Insufficient data</h2>
         <p className="mt-2 text-sm text-muted-foreground">{risk.explanation}</p>
-        <p className="mt-3 text-xs text-muted-foreground">Pollutant data: {risk.dataCompleteness?.available ?? 0}/{risk.dataCompleteness?.total ?? 6} available ({risk.dataCompleteness?.percentage ?? 0}%).</p>
+        <div className="mt-3 space-y-1 text-xs text-muted-foreground">
+          <p>Pollutant indices: {risk.dataCompleteness?.available ?? 0}/{risk.dataCompleteness?.total ?? 6} available ({risk.dataCompleteness?.percentage ?? 0}%).</p>
+          <p>Ground-station measurements: {risk.dataCompleteness?.stationMeasurements ?? 0}/{risk.dataCompleteness?.total ?? 6}</p>
+          <p>Modelled estimates: {risk.dataCompleteness?.modelledEstimates ?? 0}/{risk.dataCompleteness?.total ?? 6}</p>
+        </div>
         <p className="mt-4 text-xs text-muted-foreground">{risk.disclaimer}</p>
       </div>
     );
@@ -71,8 +75,16 @@ export default function HealthRiskCard({ risk }) {
             {risk.explanation}
           </p>
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground" data-testid="risk-data-quality">
-            <span>Pollutant data: {risk.dataCompleteness?.available ?? 0}/{risk.dataCompleteness?.total ?? 6} available ({risk.dataCompleteness?.percentage ?? 0}%)</span>
+            <span>Pollutant indices: {risk.dataCompleteness?.available ?? 0}/{risk.dataCompleteness?.total ?? 6} available ({risk.dataCompleteness?.percentage ?? 0}%)</span>
             <span>Sources: {sourceLabel}</span>
+          </div>
+          <div className="rounded-lg border border-border bg-muted/30 p-3 text-xs text-muted-foreground" data-testid="risk-source-completeness">
+            <div className="flex flex-wrap gap-x-5 gap-y-1">
+              <span>Ground-station measurements: <strong className="text-foreground">{risk.dataCompleteness?.stationMeasurements ?? 0}/{risk.dataCompleteness?.total ?? 6}</strong></span>
+              <span>Modelled estimates: <strong className="text-foreground">{risk.dataCompleteness?.modelledEstimates ?? 0}/{risk.dataCompleteness?.total ?? 6}</strong></span>
+              {(risk.dataCompleteness?.unclassified ?? 0) > 0 && <span>Unverified source: <strong className="text-foreground">{risk.dataCompleteness.unclassified}/{risk.dataCompleteness?.total ?? 6}</strong></span>}
+            </div>
+            {hasModel && <p className="mt-2">Modelled estimates are not ground-station measurements.</p>}
           </div>
           {risk.scoreMode === "aqi_only" && (
             <p className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-xs text-muted-foreground">
