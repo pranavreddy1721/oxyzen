@@ -319,12 +319,11 @@ async def pollutant_detail(pollutant: str, locationId: str = "", lat: Optional[f
     current = snap["pollutants"].get(pollutant)
     if current is None:
         raise HTTPException(status_code=404, detail="No current pollutant sub-index is available from the selected data sources.")
-    ratio = current / meta["reference"]
-    if ratio <= 1:
+    if current <= 50:
         severity = "Good"
-    elif ratio <= 2:
+    elif current <= 100:
         severity = "Moderate"
-    elif ratio <= 3.5:
+    elif current <= 150:
         severity = "High"
     else:
         severity = "Very High"
