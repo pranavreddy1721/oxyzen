@@ -20,10 +20,15 @@ def test_current_snapshot_uses_waqi(monkeypatch):
     assert snap["source"]["provider"]=="World Air Quality Index (WAQI)"
     assert snap["source"]["origin"]=="CPCB India"
 
-def test_missing_token_fails_without_simulation(monkeypatch):
-    monkeypatch.delenv("WAQI_TOKEN",raising=False)
-    try: aqi_data.current_snapshot(aqi_data.CITIES[2]); assert False
-    except RuntimeError as exc: assert "WAQI_TOKEN" in str(exc)
+def test_missing_token_fails_without_simulation(monkeypatch, caplog):
+    monkeypatch.delenv("WAQI_TOKEN", raising=False)
+    try:
+        aqi_data.current_snapshot(aqi_data.CITIES[2])
+        assert False, "expected a missing WAQI token to prevent a live snapshot"
+    except RuntimeError:
+        # The feed resolver reports the final station-resolution error while
+        # retaining the original missing-token cause in its warning logs.
+        assert "WAQI_TOKEN is not configured" in caplog.text
 
 def test_history_is_not_fabricated():
     assert aqi_data.history(aqi_data.CITIES[2],"24h")==[]
