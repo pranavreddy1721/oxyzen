@@ -52,8 +52,9 @@ class TestAQI:
         d = r.json()
         assert isinstance(d["aqi"], int) and 0 <= d["aqi"] <= 500
         assert isinstance(d["category"], str) and d["category"]
-        assert set(POLLUTANTS).issubset(d["pollutants"].keys())
+        assert set(d["pollutants"]).issubset(set(POLLUTANTS))
         assert set(POLLUTANTS).issubset(d["pollutantMeta"].keys())
+        assert isinstance(d.get("pollutantDataSources", {}), dict)
         assert isinstance(d["scale"], list) and len(d["scale"]) >= 5
         assert "_id" not in d
 
@@ -150,13 +151,18 @@ class TestHealthRisk:
         d = r.json()
         assert d["riskLevel"] in ("LOW", "MODERATE", "ELEVATED", "HIGH", "SEVERE")
         assert 0 <= d["riskScore"] <= 100
-        assert len(d["mainContributors"]) > 0
-        c = d["mainContributors"][0]
-        assert "label" in c or "name" in c
-        assert isinstance(d["explanation"], str) and len(d["explanation"]) > 10
-        assert len(d["healthImpacts"]) > 0
-        assert len(d["precautions"]) > 0
-        assert d["activityGuidance"]
+        assert d["scoreMode"] in ("pollutant_weighted", "aqi_only", "insufficient")
+        assert isinstance(d["dataCompleteness"]["percentage"], int)
+        if d["riskScore"] is not None:
+            assert len(d["mainContributors"]) > 0
+            c = d["mainContributors"][0]
+            assert "label" in c or "name" in c
+            assert isinstance(d["explanation"], str) and len(d["explanation"]) > 10
+            assert len(d["healthImpacts"]) > 0
+            assert len(d["precautions"]) > 0
+            assert d["activityGuidance"]
+        else:
+            assert d["riskLevel"] == "INSUFFICIENT DATA"
         assert d["location"]["id"] == "delhi"
 
     def test_low_vs_high_ordering(self, client):
