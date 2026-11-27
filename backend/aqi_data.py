@@ -209,6 +209,8 @@ def current_snapshot(loc):
  try:
   data,distance,slat,slon=_resolve_feed(loc)
  except Exception as exc:
+  if not os.environ.get("WAQI_TOKEN","").strip():
+   raise
   logger.warning("No fresh WAQI station for %s; trying Open-Meteo current US AQI fallback: %s",loc.get("name"),exc)
   return _open_meteo_snapshot(loc)
  aqi=max(0,min(500,int(round(float(data["aqi"])))));sub=_subindices(data);cat=category_for_aqi(aqi);updated=_provider_time(data);source=_source(data);source.update({"stationLat":slat,"stationLon":slon,"distanceKm":round(distance,1),"matchType":"direct" if distance<=5 else "nearby","dataType":"Direct monitoring station" if distance<=5 else "Nearby/associated monitoring station"});return {"location":{"id":loc["id"],"name":loc["name"],"country":loc.get("country",""),"lat":float(loc["lat"]),"lon":float(loc["lon"])},"aqi":aqi,"category":cat["label"],"categoryKey":cat["key"],"color":cat["color"],"dominantPollutant":data.get("dominentpol"),"pollutants":sub,"pollutantSubIndices":sub,"updatedAt":updated,"providerUpdatedAt":updated,"source":source}
