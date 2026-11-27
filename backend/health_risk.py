@@ -5,7 +5,7 @@ therefore uses the sub-index scale only and never interprets it as µg/m³ or mg
 """
 from aqi_data import POLLUTANT_META
 
-HIGH_LEVEL = {k: 100.0 for k in POLLUTANT_META}
+HIGH_LEVEL = {k: 500.0 for k in POLLUTANT_META}
 WEIGHTS = {"pm25":0.34,"aqi":0.24,"pm10":0.14,"o3":0.12,"no2":0.08,"so2":0.05,"co":0.03}
 RISK_BANDS=[(0,20,"LOW","low"),(21,40,"MODERATE","moderate"),(41,60,"ELEVATED","elevated"),(61,80,"HIGH","high"),(81,100,"SEVERE","severe")]
 RISK_COLORS={"low":"#10B981","moderate":"#F59E0B","elevated":"#F97316","high":"#EF4444","severe":"#9F1239"}
@@ -16,24 +16,80 @@ def _band(score:int):
     return "SEVERE","severe"
 
 def _norm(value,high):
-    try:return max(0.0,min(1.0,float(value)/high))
-    except (TypeError,ValueError):return 0.0
+    try:
+        number=float(value)
+        if number < 0:return None
+        return max(0.0,min(1.0,number/high))
+    except (TypeError,ValueError):
+        return None
 
-def assess(aqi:int,pollutants:dict)->dict:
+def _aqi_only_score(aqi):
+    """Map US AQI bands to the app's 0-100 awareness indicator (not a clinical risk)."""
+    points=((0,0),(50,20),(100,40),(150,60),(200,80),(300,90),(500,100))
+    value=max(0.0,min(500.0,float(aqi)))
+    for (x0,y0),(x1,y1) in zip(points,points[1:]):
+        if value<=x1:
+            return int(round(y0+(value-x0)*(y1-y0)/(x1-x0)))
+    return 100
+
+def assess(aqi:int,pollutants:dict,pollutant_sources:dict=None,aqi_source:dict=None)->dict:
     pollutants=pollutants or {}
+    pollutant_sources=pollutant_sources or {}
     subs={k:_norm(pollutants.get(k),HIGH_LEVEL[k]) for k in HIGH_LEVEL}
-    aqi_norm=max(0.0,min(1.0,float(aqi)/300.0))
-    weighted=aqi_norm*WEIGHTS["aqi"]+sum(subs[k]*WEIGHTS[k] for k in HIGH_LEVEL)
-    score=max(0,min(100,int(round(weighted*100))))
+    available=[k for k,v in subs.items() if v is not None]
+    has_particulate=any(k in available for k in ("pm25","pm10"))
+    complete_count=len(available)
+    completeness=round(complete_count/len(HIGH_LEVEL)*100)
+    sufficient=complete_count>=2 and has_particulate
+    if aqi is None:
+        return {
+            "aqi":None,"riskScore":None,"riskLevel":"INSUFFICIENT DATA","riskLevelKey":"insufficient",
+            "riskColor":"#64748B","scoreMode":"insufficient","scoreModeLabel":"Insufficient data",
+            "dataCompleteness":{"available":complete_count,"total":len(HIGH_LEVEL),"percentage":completeness},
+            "pollutantSources":pollutant_sources,"mainContributors":[],
+            "explanation":"A current AQI reading is unavailable, so OxyZen cannot calculate an environmental risk indicator.",
+            "healthImpacts":[],"precautions":["Try again when a fresh AQI or pollutant reading is available."],
+            "activityGuidance":[],"disclaimer":"Environmental Risk Indicator is an awareness indicator, not a medical diagnosis or clinical assessment."
+        }
+    aqi_value=max(0.0,min(500.0,float(aqi)))
+    contributors_raw={}
+    if sufficient:
+        aqi_norm=aqi_value/500.0
+        contributors_raw["AQI"]=aqi_norm*WEIGHTS["aqi"]
+        for k in available:
+            contributors_raw[POLLUTANT_META[k]["name"]]=subs[k]*WEIGHTS[k]
+        denominator=WEIGHTS["aqi"]+sum(WEIGHTS[k] for k in available)
+        score=int(round(100*sum(contributors_raw.values())/denominator)) if denominator else 0
+        mode="pollutant_weighted"
+        mode_label="Pollutant-weighted indicator"
+        top_names=[name for name,value in sorted(contributors_raw.items(),key=lambda item:item[1],reverse=True)[:2] if value>0]
+        explanation=_explanation(_band(max(0,min(100,score)))[1],top_names)
+        explanation += " This score uses available WAQI station and/or Open-Meteo modelled pollutant AQI sub-indices."
+    else:
+        score=_aqi_only_score(aqi_value)
+        mode="aqi_only"
+        mode_label="AQI-based indicator"
+        contributors_raw={"AQI":1.0}
+        label_for_aqi = "overall US AQI"
+        explanation=(f"The indicator is based on overall US AQI ({int(round(aqi_value))}) because fewer than two pollutant sub-indices, or no particulate sub-index, were available. "
+                     "Missing pollutant readings are not treated as zero. This is an AQI-based awareness indicator, not a clinical health-risk prediction.")
+    score=max(0,min(100,int(score)))
     label,key=_band(score)
-    contrib_raw={"AQI":aqi_norm*WEIGHTS["aqi"]}
-    for k in HIGH_LEVEL: contrib_raw[POLLUTANT_META[k]["name"]]=subs[k]*WEIGHTS[k]
-    total=sum(contrib_raw.values()) or 1.0
-    contributors=[{"name":n,"share":round(v/total,3),"intensity":0.0} for n,v in sorted(contrib_raw.items(),key=lambda x:x[1],reverse=True)]
+    total=sum(contributors_raw.values()) or 1.0
+    contributors=[{"name":n,"share":round(v/total,3),"intensity":0.0} for n,v in sorted(contributors_raw.items(),key=lambda x:x[1],reverse=True)]
     top=contributors[0]["share"] if contributors else 1.0
-    for c in contributors:c["intensity"]=round(min(1.0,c["share"]/top),2) if top else 0.0
-    top_names=[c["name"] for c in contributors[:2] if c["share"]>0.05]
-    return {"aqi":aqi,"riskScore":score,"riskLevel":label,"riskLevelKey":key,"riskColor":RISK_COLORS[key],"mainContributors":contributors,"explanation":_explanation(key,top_names),"healthImpacts":_impacts(key),"precautions":_precautions(key),"activityGuidance":_activities(aqi),"scoreBands":[{"range":"0–20","label":"Low"},{"range":"21–40","label":"Moderate"},{"range":"41–60","label":"Elevated"},{"range":"61–80","label":"High"},{"range":"81–100","label":"Severe"}],"disclaimer":"Environmental Health Risk Score — an awareness indicator based on current AQI and WAQI pollutant sub-indices. Not a medical diagnosis or clinical assessment."}
+    for item in contributors:item["intensity"]=round(min(1.0,item["share"]/top),2) if top else 0.0
+    return {
+        "aqi":int(round(aqi_value)),"riskScore":score,"riskLevel":label,"riskLevelKey":key,
+        "riskColor":RISK_COLORS[key],"scoreMode":mode,"scoreModeLabel":mode_label,
+        "dataCompleteness":{"available":complete_count,"total":len(HIGH_LEVEL),"percentage":completeness},
+        "pollutantSources":pollutant_sources,"aqiSource":aqi_source or {},
+        "mainContributors":contributors,"explanation":explanation,
+        "healthImpacts":_impacts(key),"precautions":_precautions(key),
+        "activityGuidance":_activities(int(round(aqi_value))),
+        "scoreBands":[{"range":"0–20","label":"Low"},{"range":"21–40","label":"Moderate"},{"range":"41–60","label":"Elevated"},{"range":"61–80","label":"High"},{"range":"81–100","label":"Severe"}],
+        "disclaimer":"Environmental Risk Indicator — an application-defined awareness score based on US AQI and available pollutant AQI sub-indices. Modelled estimates are identified separately from station measurements. Not a medical diagnosis or clinical assessment."
+    }
 
 def _explanation(key,top_names):
     factors=" and ".join(top_names or ["overall air quality"])
