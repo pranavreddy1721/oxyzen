@@ -20,7 +20,7 @@ jobs:
         with:
           python-version: "3.11"
       - name: Install test dependencies
-        run: python -m pip install --upgrade pip pytest requests
+        run: python -m pip install --upgrade pip pytest pytest-xdist requests
       - name: Run source-aware AQI and risk tests
         env:
           PYTHONPATH: backend
