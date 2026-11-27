@@ -562,6 +562,9 @@ async def startup():
         await db.users.create_index("email", unique=True)
         await db.saved_locations.create_index([("userId", 1), ("locationId", 1)])
         await db.aqi_records.create_index([("userId", 1), ("createdAt", -1)])
+        await db.aqi_notifications.create_index([("userId", 1), ("createdAt", -1)])
+        await db.aqi_notifications.create_index("eventKey", unique=True)
+        await db.aqi_alert_states.create_index("userId")
     except Exception as e:
         logger.warning(f"index creation: {e}")
     # AQI alert checks run as a scheduled one-shot worker (GitHub Actions).
