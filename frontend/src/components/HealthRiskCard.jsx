@@ -80,8 +80,8 @@ export default function HealthRiskCard({ risk }) {
           )}
           {risk.scoreMode === "pollutant_weighted" && (
             <div className="flex flex-wrap gap-2 text-[11px] text-muted-foreground" data-testid="risk-source-legend">
-              <span className="rounded-full border border-border px-2 py-1">WAQI = station measurement</span>
-              <span className="rounded-full border border-border px-2 py-1">Open-Meteo = model estimate</span>
+              {hasWaqi && <span className="rounded-full border border-border px-2 py-1">WAQI = station measurement</span>}
+              {hasModel && <span className="rounded-full border border-border px-2 py-1">Open-Meteo = model estimate</span>}
             </div>
           )}
         </div>
