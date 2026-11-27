@@ -277,8 +277,11 @@ async def _log_history(loc: dict, snap: dict, user_id: Optional[str]):
 
 
 @api.get("/aqi/current")
-async def aqi_current(request: Request, locationId: str = "", lat: Optional[float] = None, lon: Optional[float] = None, locationName: str = "", locationCountry: str = ""):
+async def aqi_current(request: Request, response: Response, locationId: str = "", lat: Optional[float] = None, lon: Optional[float] = None, locationName: str = "", locationCountry: str = ""):
     loc = _resolve_location(locationId, lat, lon, locationName, locationCountry)
+    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
     snap = aqi_data.current_snapshot(loc)
     snap["scale"] = aqi_data.AQI_CATEGORIES
     snap["pollutantMeta"] = aqi_data.POLLUTANT_META
