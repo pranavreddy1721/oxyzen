@@ -2,6 +2,9 @@
 import asyncio
 import logging
 import os
+import smtplib
+import ssl
+from email.message import EmailMessage
 from datetime import datetime, timezone, timedelta
 
 import requests
@@ -17,7 +20,21 @@ MAX_READING_AGE = timedelta(hours=2)
 BREVO_URL = "https://api.brevo.com/v3/smtp/email"
 
 
+def _email_provider():
+    requested = os.environ.get("EMAIL_PROVIDER", "").strip().lower()
+    if requested in {"gmail", "brevo"}:
+        return requested
+    if os.environ.get("SMTP_USERNAME", "").strip() and os.environ.get("SMTP_APP_PASSWORD", "").strip():
+        return "gmail"
+    return "brevo"
+
+
 def is_email_configured():
+    if _email_provider() == "gmail":
+        return bool(
+            os.environ.get("SMTP_USERNAME", "").strip()
+            and os.environ.get("SMTP_APP_PASSWORD", "").strip()
+        )
     return bool(
         os.environ.get("BREVO_API_KEY", "").strip()
         and os.environ.get("BREVO_SENDER_EMAIL", "").strip()
@@ -36,6 +53,28 @@ def _provider_timestamp(snapshot):
 
 
 def _send_email(to, subject, body):
+    """Send via Gmail SMTP (free personal Gmail) or Brevo, based on EMAIL_PROVIDER."""
+    provider = _email_provider()
+    if provider == "gmail":
+        username = os.environ["SMTP_USERNAME"].strip()
+        password = os.environ["SMTP_APP_PASSWORD"].replace(" ", "").strip()
+        sender = os.environ.get("SMTP_FROM_EMAIL", username).strip() or username
+        host = os.environ.get("SMTP_HOST", "smtp.gmail.com").strip()
+        port = int(os.environ.get("SMTP_PORT", "587"))
+        message = EmailMessage()
+        message["From"] = f'{os.environ.get("SMTP_FROM_NAME", "OxyZen AQI Monitor")} <{sender}>'
+        message["To"] = to
+        message["Subject"] = subject
+        message.set_content(body)
+        context = ssl.create_default_context()
+        with smtplib.SMTP(host, port, timeout=20) as server:
+            server.ehlo()
+            server.starttls(context=context)
+            server.ehlo()
+            server.login(username, password)
+            server.send_message(message)
+        return
+
     response = requests.post(
         BREVO_URL,
         headers={

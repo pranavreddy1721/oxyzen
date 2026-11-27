@@ -63,8 +63,13 @@ jobs:
           MONGO_URL: ${{ secrets.MONGO_URL }}
           DB_NAME: ${{ secrets.DB_NAME }}
           WAQI_TOKEN: ${{ secrets.WAQI_TOKEN }}
-          BREVO_API_KEY: ${{ secrets.BREVO_API_KEY }}
-          BREVO_SENDER_EMAIL: ${{ secrets.BREVO_SENDER_EMAIL }}
-          BREVO_SENDER_NAME: ${{ secrets.BREVO_SENDER_NAME }}
+          # Free Gmail SMTP sender (requires a Google App Password, not the account password).
+          EMAIL_PROVIDER: gmail
+          SMTP_USERNAME: ${{ secrets.SMTP_USERNAME }}
+          SMTP_APP_PASSWORD: ${{ secrets.SMTP_APP_PASSWORD }}
+          SMTP_FROM_EMAIL: ${{ secrets.SMTP_FROM_EMAIL }}
+          SMTP_FROM_NAME: OxyZen AQI Monitor
+          SMTP_HOST: smtp.gmail.com
+          SMTP_PORT: "587"
           AQI_ALERT_POLL_SECONDS: "300"
         run: python alert_worker.py
