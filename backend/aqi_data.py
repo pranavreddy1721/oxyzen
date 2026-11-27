@@ -269,13 +269,93 @@ def _open_meteo_snapshot(loc):
         "providerUpdatedAt":updated.isoformat(),"source":source,
     }
 
+# CPCB / data.gov.in official Indian monitoring feed.
+DATA_GOV_RESOURCE = "3b01bcb8-0b14-4abf-b6f2-c1bfd384ba69"
+_CPCB_CACHE = {}
+_CPCB_CACHE_TTL = 300
+_CPCB_STATE = {"delhi": "Delhi", "mumbai": "Maharashtra", "pune": "Maharashtra", "sangli": "Maharashtra", "kolhapur": "Maharashtra", "bengaluru": "Karnataka", "kolkata": "West Bengal"}
+
+def _safe_float(value):
+    try:
+        result = float(value)
+        return result if math.isfinite(result) else None
+    except (TypeError, ValueError):
+        return None
+
+def cpcb_station_data(loc):
+    """Return raw CPCB station pollutant observations; never mislabel concentrations as AQI."""
+    api_key = os.environ.get("DATA_GOV_IN_API_KEY", "").strip()
+    if not api_key:
+        return {"available": False, "reason": "DATA_GOV_IN_API_KEY is not configured", "stations": []}
+    city = str(loc.get("name") or "").strip()
+    state = _CPCB_STATE.get(str(loc.get("id") or "").lower())
+    if not state:
+        state = "Delhi" if city.lower() == "delhi" else str(loc.get("admin1") or "").strip()
+    if not city or not state:
+        return {"available": False, "reason": "No supported CPCB city/state mapping for this location", "stations": []}
+    cache_key = (city.lower(), state.lower())
+    now = time.monotonic()
+    cached = _CPCB_CACHE.get(cache_key)
+    if cached and now - cached[0] < _CPCB_CACHE_TTL:
+        return cached[1]
+    try:
+        response = requests.get(
+            f"https://api.data.gov.in/resource/{DATA_GOV_RESOURCE}",
+            params={"api-key": api_key, "format": "json", "limit": 1000, "offset": 0,
+                    "filters[city]": city, "filters[state]": state},
+            timeout=12,
+        )
+        response.raise_for_status()
+        records = response.json().get("records") or []
+        grouped = {}
+        for row in records:
+            station = str(row.get("station") or "").strip()
+            pollutant = str(row.get("pollutant_id") or "").strip().upper()
+            if not station or not pollutant:
+                continue
+            value = _safe_float(row.get("avg_value"))
+            if value is None or value < 0:
+                continue
+            entry = grouped.setdefault(station, {
+                "station": station, "city": row.get("city"), "state": row.get("state"),
+                "latitude": _safe_float(row.get("latitude")), "longitude": _safe_float(row.get("longitude")),
+                "lastUpdate": row.get("last_update"), "pollutants": {},
+            })
+            entry["pollutants"][pollutant] = {
+                "average": value, "minimum": _safe_float(row.get("min_value")),
+                "maximum": _safe_float(row.get("max_value")),
+                "unit": row.get("unit") or row.get("pollutant_unit") or "",
+            }
+            if str(row.get("last_update") or "") > str(entry.get("lastUpdate") or ""):
+                entry["lastUpdate"] = row.get("last_update")
+        stations = sorted(grouped.values(), key=lambda item: item["station"])
+        result = {"available": bool(stations), "provider": "CPCB via data.gov.in",
+                  "providerUrl": "https://data.gov.in/resource/real-time-air-quality-index-various-locations",
+                  "dataType": "Official station pollutant observations (raw averages; not a computed National AQI)",
+                  "city": city, "state": state, "stations": stations,
+                  "recordCount": len(records), "updatedAt": max((s.get("lastUpdate") or "" for s in stations), default=None)}
+        if not stations:
+            result["reason"] = "No CPCB station observations returned for this city"
+        _CPCB_CACHE[cache_key] = (now, result)
+        return result
+    except Exception as exc:
+        logger.warning("CPCB data.gov.in request failed for %s: %s", city, exc)
+        return {"available": False, "provider": "CPCB via data.gov.in", "stations": [],
+                "reason": "Official CPCB feed is temporarily unavailable"}
+
+def _attach_cpcb_data(snapshot, loc):
+    if loc.get("country") == "India":
+        snapshot["officialStationData"] = cpcb_station_data(loc)
+    return snapshot
+
+
 def current_snapshot(loc):
     try:
         data,distance,slat,slon=_resolve_feed(loc)
     except Exception as exc:
         logger.warning("No fresh WAQI station for %s; trying Open-Meteo current AQI and pollutant fallback: %s",loc.get("name"),exc)
         try:
-            return _open_meteo_snapshot(loc)
+            return _attach_cpcb_data(_open_meteo_snapshot(loc), loc)
         except Exception as fallback_exc:
             logger.error("No usable WAQI or Open-Meteo data for %s: %s",loc.get("name"),fallback_exc)
             return {
@@ -284,7 +364,7 @@ def current_snapshot(loc):
                 "dominantPollutant":None,"pollutants":{},"pollutantSubIndices":{},
                 "pollutantDataSources":{},"updatedAt":None,"providerUpdatedAt":None,
                 "source":{"provider":"Unavailable","station":"No current data source","dataType":"No fresh AQI or pollutant data available"},
-            }
+            }, loc)
 
     aqi=max(0,min(500,int(round(float(data["aqi"])))))
     pollutants=_subindices(data)
@@ -318,7 +398,7 @@ def current_snapshot(loc):
         "pollutants":pollutants,"pollutantSubIndices":pollutants,
         "pollutantDataSources":pollutant_sources,
         "updatedAt":updated,"providerUpdatedAt":updated,"source":source,
-    }
+    }, loc)
 def history(loc,kind="24h"): return []
 def forecast(loc,days=5):
  try:
