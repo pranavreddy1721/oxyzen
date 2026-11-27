@@ -101,36 +101,23 @@ def test_unknown_source_is_not_mislabelled_as_station_or_model():
     assert result["dataCompleteness"]["unclassified"] == 2
 
 
-def test_cpcb_station_feed_groups_raw_observations_without_claiming_national_aqi(monkeypatch):
+def test_cpcb_mirror_without_fresh_station_data_returns_unavailable(monkeypatch):
     class FakeResponse:
         def raise_for_status(self):
             pass
 
         def json(self):
-            return {"records": [
-                {"station": "Station A", "city": "Delhi", "state": "Delhi", "pollutant_id": "PM2.5",
-                 "avg_value": "72", "min_value": "60", "max_value": "80", "last_update": "27-11-2026 12:00:00",
-                 "latitude": "28.6", "longitude": "77.2", "unit": "ug/m3"},
-                {"station": "Station A", "city": "Delhi", "state": "Delhi", "pollutant_id": "PM10",
-                 "avg_value": "110", "min_value": "90", "max_value": "120", "last_update": "27-11-2026 12:00:00",
-                 "latitude": "28.6", "longitude": "77.2", "unit": "ug/m3"},
-            ]}
+            return {"data": [], "meta": {"source": {"attribution": "CPCB monitoring stations"}}}
 
-    monkeypatch.setenv("DATA_GOV_IN_API_KEY", "test-key")
+    monkeypatch.delenv("DATA_GOV_IN_API_KEY", raising=False)
     monkeypatch.setattr(aqi_data.requests, "get", lambda *args, **kwargs: FakeResponse())
     aqi_data._CPCB_CACHE.clear()
-    result = aqi_data.cpcb_station_data({"id": "delhi", "name": "Delhi", "country": "India"})
-    assert result["available"] is True
-    assert len(result["stations"]) == 1
-    assert result["stations"][0]["pollutants"]["PM2.5"]["average"] == 72
-    assert "not a computed National AQI" in result["dataType"]
-
-
-def test_cpcb_feed_reports_missing_key_without_request(monkeypatch):
-    monkeypatch.delenv("DATA_GOV_IN_API_KEY", raising=False)
-    result = aqi_data.cpcb_station_data({"id": "delhi", "name": "Delhi", "country": "India"})
+    result = aqi_data.cpcb_station_data(
+        {"id": "kolhapur", "name": "Kolhapur", "country": "India"}
+    )
     assert result["available"] is False
     assert result["stations"] == []
+    assert "No fresh CPCB station readings" in result["reason"]
 
 
 def test_cpcb_mirror_response_is_normalized_to_primary_india_aqi(monkeypatch):
