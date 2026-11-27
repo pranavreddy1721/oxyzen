@@ -36,7 +36,7 @@ def make_custom_location(lat,lon,name=None,country=""): return {"id":f"coord_{ro
 def _waqi_json(path,params=None):
  token=os.environ.get("WAQI_TOKEN","").strip()
  if not token:raise RuntimeError("WAQI_TOKEN is not configured on the backend")
- p=dict(params or {}); p["token"]=token; r=requests.get(f"{WAQI_BASE}{path}",params=p,timeout=10); r.raise_for_status(); payload=r.json()
+ p=dict(params or {}); p["token"]=token; r=requests.get(f"{WAQI_BASE}{path}",params=p,timeout=10,headers={"Cache-Control":"no-cache, no-store, max-age=0","Pragma":"no-cache"}); r.raise_for_status(); payload=r.json()
  if payload.get("status")!="ok":raise RuntimeError(str(payload.get("data") or "WAQI request failed"))
  return payload.get("data") or {}
 def _has_usable_aqi(data):
@@ -174,7 +174,7 @@ def _open_meteo_snapshot(loc):
         "longitude":float(loc["lon"]),
         "current":"us_aqi",
         "timezone":"auto",
-    },timeout=10)
+    },timeout=10,headers={"Cache-Control":"no-cache, no-store, max-age=0","Pragma":"no-cache"})
     response.raise_for_status()
     payload=response.json()
     current=payload.get("current") or {}
