@@ -1,10 +1,4 @@
-"""Opt-in current-location AQI email monitoring.
-
-The worker is intentionally inactive unless Resend credentials are configured.
-It checks each opted-in user's selected browser location every 15 minutes,
-ignores provider readings older than two hours, and sends only threshold
-crossing/recovery transitions.
-"""
+"""Opt-in current-location AQI email monitoring via Brevo."""
 import asyncio
 import logging
 import os
@@ -15,7 +9,11 @@ import aqi_data
 
 POLL_SECONDS = max(60, int(os.environ.get("AQI_ALERT_POLL_SECONDS", "900")))
 MAX_READING_AGE = timedelta(hours=2)
-RESEND_URL = "https://api.resend.com/emails"
+BREVO_URL = "https://api.brevo.com/v3/smtp/email"
+
+
+def is_email_configured():
+    return bool(os.environ.get("BREVO_API_KEY", "").strip() and os.environ.get("BREVO_SENDER_EMAIL", "").strip())
 
 
 def _provider_timestamp(snapshot):
@@ -30,12 +28,18 @@ def _provider_timestamp(snapshot):
 
 
 def _send_email(to, subject, body):
-    api_key = os.environ["RESEND_API_KEY"]
-    sender = os.environ["ALERT_FROM_EMAIL"]
+    api_key = os.environ["BREVO_API_KEY"].strip()
+    sender_email = os.environ["BREVO_SENDER_EMAIL"].strip()
+    sender_name = os.environ.get("BREVO_SENDER_NAME", "OXYZEN").strip() or "OXYZEN"
     response = requests.post(
-        RESEND_URL,
-        headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
-        json={"from": sender, "to": [to], "subject": subject, "text": body},
+        BREVO_URL,
+        headers={"api-key": api_key, "accept": "application/json", "Content-Type": "application/json"},
+        json={
+            "sender": {"name": sender_name, "email": sender_email},
+            "to": [{"email": to}],
+            "subject": subject,
+            "textContent": body,
+        },
         timeout=15,
     )
     response.raise_for_status()
@@ -48,8 +52,6 @@ async def _send_transition(db, user, state, snapshot, logger):
     if state == current_state:
         return
 
-    # Claim the transition atomically so multiple API instances do not send
-    # the same notification at the same time.
     state_filter = (
         {"$or": [{"monitorState": "clear"}, {"monitorState": {"$exists": False}}]}
         if current_state == "clear"
@@ -67,30 +69,29 @@ async def _send_transition(db, user, state, snapshot, logger):
         subject = f"OXYZEN AQI alert: {snapshot['aqi']} at {location}"
         message = (
             f"The latest available AQI reading for {location} is {snapshot['aqi']} "
-            f"({snapshot.get('category', 'Unknown')}), at or above your alert threshold of {threshold}.\n\n"
-            f"Monitoring station: {snapshot.get('source', {}).get('station', 'WAQI station')}\n"
-            f"Station updated: {snapshot.get('providerUpdatedAt')}\n"
+            f"({snapshot.get('category', 'Unknown')}), at or above your alert threshold of {threshold}.\\n\\n"
+            f"Monitoring station: {snapshot.get('source', {}).get('station', 'WAQI station')}\\n"
+            f"Station updated: {snapshot.get('providerUpdatedAt')}\\n"
             "This is an environmental-awareness notification, not medical advice."
         )
     else:
         subject = f"OXYZEN: Air quality recovered at {location}"
         message = (
             f"The latest available AQI reading for {location} is {snapshot['aqi']}, "
-            f"below your alert threshold of {threshold}.\n\n"
-            f"Monitoring station: {snapshot.get('source', {}).get('station', 'WAQI station')}\n"
-            f"Station updated: {snapshot.get('providerUpdatedAt')}\n"
+            f"below your alert threshold of {threshold}.\\n\\n"
+            f"Monitoring station: {snapshot.get('source', {}).get('station', 'WAQI station')}\\n"
+            f"Station updated: {snapshot.get('providerUpdatedAt')}\\n"
             "This is an environmental-awareness notification, not medical advice."
         )
 
     try:
-        await asyncio.to_thread(_send_email, user.get("email", ""), subject, message)
+        recipient = (user.get("email") or "").strip()
+        if not recipient:
+            raise ValueError("User has no registered email address")
+        await asyncio.to_thread(_send_email, recipient, subject, message)
         logger.info("AQI %s email sent for user %s", state, str(uid))
     except Exception:
-        # Revert the claim so a later poll can retry delivery.
-        await db.users.update_one(
-            {"_id": uid, "monitorState": state},
-            {"$set": {"monitorState": current_state}},
-        )
+        await db.users.update_one({"_id": uid, "monitorState": state}, {"$set": {"monitorState": current_state}})
         logger.exception("AQI alert email delivery failed for user %s", str(uid))
 
 
@@ -100,7 +101,6 @@ async def check_user(db, user, logger):
     lat, lon = user.get("monitorLat"), user.get("monitorLon")
     if lat is None or lon is None:
         return
-
     location = aqi_data.make_custom_location(
         float(lat), float(lon),
         user.get("monitorLocationName") or None,
