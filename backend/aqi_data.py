@@ -167,8 +167,50 @@ def _provider_time(data):
             logger.warning("Could not parse WAQI epoch timestamp: %s", raw_epoch)
     return None
 
+def _open_meteo_snapshot(loc):
+    url="https://air-quality-api.open-meteo.com/v1/air-quality"
+    response=requests.get(url,params={
+        "latitude":float(loc["lat"]),
+        "longitude":float(loc["lon"]),
+        "current":"us_aqi",
+        "timezone":"auto",
+    },timeout=10)
+    response.raise_for_status()
+    payload=response.json()
+    current=payload.get("current") or {}
+    raw_aqi=current.get("us_aqi")
+    stamp=current.get("time")
+    if raw_aqi is None or not stamp:
+        raise RuntimeError("Open-Meteo did not return a current US AQI reading")
+    updated=datetime.fromisoformat(str(stamp).replace("Z","+00:00"))
+    if updated.tzinfo is None:
+        updated=updated.replace(tzinfo=timezone.utc)
+    now=datetime.now(timezone.utc)
+    age=(now-updated.astimezone(timezone.utc)).total_seconds()
+    if age < -900 or age > 10800:
+        raise RuntimeError(f"Open-Meteo current AQI timestamp is outside freshness window (age_seconds={age:.0f})")
+    aqi=max(0,min(500,int(round(float(raw_aqi)))))
+    cat=category_for_aqi(aqi)
+    source={
+        "provider":"Open-Meteo CAMS Air Quality",
+        "providerUrl":"https://open-meteo.com/en/docs/air-quality-api",
+        "station":"CAMS model grid cell",
+        "stationLat":payload.get("latitude"),
+        "stationLon":payload.get("longitude"),
+        "distanceKm":round(_distance_km(float(loc["lat"]),float(loc["lon"]),float(payload.get("latitude",loc["lat"])),float(payload.get("longitude",loc["lon"]))),1),
+        "matchType":"model",
+        "dataType":"Modelled current US AQI (not a ground monitoring station)",
+    }
+    logger.info("Using fresh Open-Meteo US AQI fallback for %s: AQI=%s updated=%s",loc.get("name"),aqi,updated.isoformat())
+    return {"location":{"id":loc["id"],"name":loc["name"],"country":loc.get("country",""),"lat":float(loc["lat"]),"lon":float(loc["lon"])},"aqi":aqi,"category":cat["label"],"categoryKey":cat["key"],"color":cat["color"],"dominantPollutant":None,"pollutants":{},"pollutantSubIndices":{},"updatedAt":updated.isoformat(),"providerUpdatedAt":updated.isoformat(),"source":source}
+
 def current_snapshot(loc):
- data,distance,slat,slon=_resolve_feed(loc);aqi=max(0,min(500,int(round(float(data["aqi"])))));sub=_subindices(data);cat=category_for_aqi(aqi);updated=_provider_time(data);source=_source(data);source.update({"stationLat":slat,"stationLon":slon,"distanceKm":round(distance,1),"matchType":"direct" if distance<=5 else "nearby","dataType":"Direct monitoring station" if distance<=5 else "Nearby/associated monitoring station"});return {"location":{"id":loc["id"],"name":loc["name"],"country":loc.get("country",""),"lat":float(loc["lat"]),"lon":float(loc["lon"])},"aqi":aqi,"category":cat["label"],"categoryKey":cat["key"],"color":cat["color"],"dominantPollutant":data.get("dominentpol"),"pollutants":sub,"pollutantSubIndices":sub,"updatedAt":updated,"providerUpdatedAt":updated,"source":source}
+ try:
+  data,distance,slat,slon=_resolve_feed(loc)
+ except Exception as exc:
+  logger.warning("No fresh WAQI station for %s; trying Open-Meteo current US AQI fallback: %s",loc.get("name"),exc)
+  return _open_meteo_snapshot(loc)
+ aqi=max(0,min(500,int(round(float(data["aqi"])))));sub=_subindices(data);cat=category_for_aqi(aqi);updated=_provider_time(data);source=_source(data);source.update({"stationLat":slat,"stationLon":slon,"distanceKm":round(distance,1),"matchType":"direct" if distance<=5 else "nearby","dataType":"Direct monitoring station" if distance<=5 else "Nearby/associated monitoring station"});return {"location":{"id":loc["id"],"name":loc["name"],"country":loc.get("country",""),"lat":float(loc["lat"]),"lon":float(loc["lon"])},"aqi":aqi,"category":cat["label"],"categoryKey":cat["key"],"color":cat["color"],"dominantPollutant":data.get("dominentpol"),"pollutants":sub,"pollutantSubIndices":sub,"updatedAt":updated,"providerUpdatedAt":updated,"source":source}
 def history(loc,kind="24h"): return []
 def forecast(loc,days=5):
  try:
