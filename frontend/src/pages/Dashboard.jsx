@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Trash2, MapPin, Clock, Bell, AlertTriangle, Plus } from "lucide-react";
+import { Trash2, MapPin, Clock, Bell, AlertTriangle, Plus, Check } from "lucide-react";
 import { toast } from "sonner";
 import api, { formatApiError } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
@@ -19,29 +19,19 @@ export default function Dashboard() {
   const [threshold, setThreshold] = useState(user?.alertThreshold ?? 150);
   const [enabled, setEnabled] = useState(user?.alertsEnabled ?? true);
   const [monitoringEnabled, setMonitoringEnabled] = useState(false);
-  const [monitorLocation, setMonitorLocation] = useState("");
-  const [monitorCoords, setMonitorCoords] = useState(null);
-  const [locating, setLocating] = useState(false);
 
   const load = () => api.get("/users/dashboard").then(({ data }) => {
     setData(data);
     setThreshold(data.alertThreshold);
     setEnabled(data.alertsEnabled);
     setMonitoringEnabled(data.monitoringEnabled ?? false);
-    setMonitorLocation(data.monitorLocationName ?? "");
-    setMonitorCoords(
-      Number.isFinite(data.monitorLat) && Number.isFinite(data.monitorLon)
-        ? { lat: data.monitorLat, lon: data.monitorLon }
-        : null
-    );
-    setMonitorCoords(
-      Number.isFinite(data.monitorLat) && Number.isFinite(data.monitorLon)
-        ? { lat: data.monitorLat, lon: data.monitorLon }
-        : null
-    );
   }).catch(() => {});
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    load();
+    const timer = window.setInterval(load, 5 * 60 * 1000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   const remove = async (id) => {
     try {
@@ -59,40 +49,21 @@ export default function Dashboard() {
   const saveAlerts = async () => {
     try {
       const payload = { threshold, enabled, monitoringEnabled };
-      if (monitoringEnabled && monitorCoords) {
-        payload.monitorLat = monitorCoords.lat;
-        payload.monitorLon = monitorCoords.lon;
-        payload.monitorLocationName = monitorLocation;
-        payload.monitorLocationCountry = data.monitorLocationCountry || "";
-        payload.monitorLocationCountry = data.monitorLocationCountry || "";
-      }
       const { data: responseData } = await api.patch("/auth/alerts", payload);
       updateUser(responseData.user);
-      setMonitorCoords(null);
       toast.success("Alert preferences saved.");
     } catch (e) { toast.error(formatApiError(e.response?.data?.detail)); }
   };
 
-  const enableCurrentLocation = () => {
-    if (!navigator.geolocation) { toast.error("Geolocation is not supported by this browser."); return; }
-    setLocating(true);
-    navigator.geolocation.getCurrentPosition(async (position) => {
-      try {
-        const lat = position.coords.latitude;
-        const lon = position.coords.longitude;
-        const { data: resolved } = await api.get("/location/reverse", { params: { lat, lon } });
-        const loc = resolved.location;
-        setMonitorCoords({ lat, lon });
-        setMonitorLocation(loc.name || "Current location");
-        setMonitoringEnabled(true);
-        toast.success("Monitoring location selected: " + loc.name);
-      } catch (e) { toast.error(formatApiError(e.response?.data?.detail)); }
-      finally { setLocating(false); }
-    }, (error) => {
-      setLocating(false);
-      toast.error(error.code === 1 ? "Location permission was denied." : "Unable to get your current location.");
-    }, { enableHighAccuracy: false, timeout: 12000, maximumAge: 300000 });
+  const markRead = async (notificationId) => {
+    try {
+      await api.patch("/users/notifications/" + notificationId + "/read");
+      load();
+    } catch (e) {
+      toast.error(formatApiError(e.response?.data?.detail));
+    }
   };
+
 
   if (!data) return <PageLoader />;
 
@@ -112,6 +83,42 @@ export default function Dashboard() {
             <span className="font-semibold">AQI alert:</span> {breached.map((b) => `${b.name} (${b.aqi})`).join(", ")} exceeded your threshold of {threshold}.
           </p>
         </div>
+      )}
+
+      {data.notifications?.length > 0 && (
+        <section className="mb-8 rounded-xl border border-border bg-card p-5" data-testid="aqi-notifications">
+          <div className="mb-4 flex items-center justify-between">
+            <div>
+              <h2 className="font-heading text-xl font-bold">AQI notifications</h2>
+              <p className="text-xs text-muted-foreground">
+                {data.unreadNotificationCount ?? 0} unread · Alerts for your saved locations
+              </p>
+            </div>
+            <Bell className="h-5 w-5 text-primary" strokeWidth={1.5} />
+          </div>
+          <div className="space-y-3">
+            {data.notifications.map((notification) => (
+              <div key={notification.id} className={"flex items-start justify-between gap-4 rounded-lg border p-3 " + (notification.read ? "border-border opacity-70" : "border-primary/40 bg-primary/5")}>
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold">{notification.title}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {notification.locationName} · AQI {notification.aqi} · Threshold {notification.threshold}
+                  </p>
+                  <p className="mt-1 text-[11px] text-muted-foreground">
+                    {notification.createdAt ? new Date(notification.createdAt).toLocaleString() : ""}
+                    {" · Email: "}
+                    {notification.emailStatus === "sent" ? "sent" : notification.emailStatus === "pending" ? "pending/retrying" : notification.emailStatus}
+                  </p>
+                </div>
+                {!notification.read && (
+                  <Button size="sm" variant="outline" onClick={() => markRead(notification.id)} aria-label="Mark notification as read">
+                    <Check className="mr-1 h-3.5 w-3.5" /> Read
+                  </Button>
+                )}
+              </div>
+            ))}
+          </div>
+        </section>
       )}
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
@@ -181,25 +188,20 @@ export default function Dashboard() {
               <h2 className="font-heading text-lg font-bold">AQI Alerts</h2>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-sm">Enable email alerts</span>
+              <span className="text-sm">Enable AQI notifications</span>
               <Switch checked={enabled} onCheckedChange={setEnabled} data-testid="alert-toggle" />
             </div>
             <div className="mt-5 border-t border-border pt-5">
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <p className="text-sm font-medium">Monitor current location</p>
-                  <p className="text-xs text-muted-foreground">Check WAQI every 15 minutes</p>
+                  <p className="text-sm font-medium">Monitor all saved locations</p>
+                  <p className="text-xs text-muted-foreground">Check each saved location every 5 minutes</p>
                 </div>
-                <Switch checked={monitoringEnabled} onCheckedChange={(value) => {
-                  if (value && !monitorCoords && !data.monitorLocationName) enableCurrentLocation();
-                  else setMonitoringEnabled(value);
-                }} data-testid="monitoring-toggle" />
+                <Switch checked={monitoringEnabled} onCheckedChange={setMonitoringEnabled} data-testid="monitoring-toggle" />
               </div>
-              <Button type="button" variant="outline" className="mt-3 w-full" onClick={enableCurrentLocation} disabled={locating}>
-                {locating ? "Getting location..." : "Use my current location"}
-              </Button>
-              {monitorLocation && <p className="mt-2 text-xs text-muted-foreground">Selected: {monitorLocation}</p>}
-              <p className="mt-2 text-xs text-muted-foreground">Your browser asks permission. OXYZEN stores the selected coordinates for monitoring and does not continuously track your device.</p>
+              <p className="mt-2 text-xs text-muted-foreground">
+                OXYZEN checks every saved location using its coordinates. Add or remove locations to change what is monitored.
+              </p>
             </div>
             <div className="mt-6">
               <div className="mb-2 flex items-center justify-between">
@@ -207,7 +209,7 @@ export default function Dashboard() {
                 <span className="font-data text-lg font-bold text-primary">{threshold}</span>
               </div>
               <Slider value={[threshold]} min={50} max={300} step={10} onValueChange={(v) => setThreshold(v[0])} data-testid="alert-slider" />
-              <p className="mt-2 text-xs text-muted-foreground">You'll receive an email when monitored AQI reaches this level. Default: 150.</p>
+              <p className="mt-2 text-xs text-muted-foreground">You'll receive an email and dashboard notification when a saved location reaches this AQI. Default: 150.</p>
             </div>
             <Button className="mt-6 w-full" onClick={saveAlerts} data-testid="save-alerts-btn">Save preferences</Button>
           </div>

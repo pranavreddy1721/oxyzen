@@ -218,9 +218,6 @@ async def update_alerts(body: AlertPrefInput, user: dict = Depends(get_current_u
         updates["alertThreshold"] = updates.pop("threshold")
     if "enabled" in updates:
         updates["alertsEnabled"] = updates.pop("enabled")
-    if "monitoringEnabled" in updates and updates["monitoringEnabled"]:
-        if updates.get("monitorLat", user.get("monitorLat")) is None:
-            raise HTTPException(status_code=422, detail="Current location coordinates are required to enable monitoring.")
     if updates:
         updates["updatedAt"] = datetime.now(timezone.utc).isoformat()
         await db.users.update_one({"_id": user["_id"]}, {"$set": updates})
@@ -431,14 +428,36 @@ async def dashboard(user: dict = Depends(get_current_user)):
         })
     recent = await db.aqi_records.find({"userId": uid}).sort("createdAt", -1).limit(8).to_list(8)
     recent_out = [{"locationName": r["locationName"], "aqi": r["aqi"], "category": r["category"], "createdAt": r["createdAt"]} for r in recent]
+    notifications = await db.aqi_notifications.find({"userId": uid}).sort("createdAt", -1).limit(20).to_list(20)
+    notification_out = [{
+        "id": str(n["_id"]), "locationName": n.get("locationName", ""),
+        "title": n.get("title", "AQI update"), "state": n.get("state", ""),
+        "aqi": n.get("aqi"), "threshold": n.get("threshold"),
+        "category": n.get("category", ""), "createdAt": n.get("createdAt"),
+        "read": bool(n.get("read", False)), "emailStatus": n.get("emailStatus", "pending"),
+    } for n in notifications]
     return {"savedLocations": locations, "recentSearches": recent_out,
+            "notifications": notification_out,
+            "unreadNotificationCount": sum(1 for n in notification_out if not n["read"]),
             "alertThreshold": user.get("alertThreshold", 150), "alertsEnabled": user.get("alertsEnabled", True),
-            "monitoringEnabled": user.get("monitoringEnabled", False),
-            "monitorLocationName": user.get("monitorLocationName", ""),
-            "monitorLocationCountry": user.get("monitorLocationCountry", ""),
-            "monitorLat": user.get("monitorLat"),
-            "monitorLon": user.get("monitorLon")}
+            "monitoringEnabled": user.get("monitoringEnabled", False)}
 
+
+
+
+@api.patch("/users/notifications/{notification_id}/read")
+async def mark_notification_read(notification_id: str, user: dict = Depends(get_current_user)):
+    try:
+        oid = ObjectId(notification_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid notification ID.")
+    result = await db.aqi_notifications.update_one(
+        {"_id": oid, "userId": str(user["_id"])},
+        {"$set": {"read": True, "readAt": datetime.now(timezone.utc).isoformat()}},
+    )
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Notification not found.")
+    return {"ok": True}
 
 # ---------------------------------------------------------------------------
 # AI assistant (OxyZen AI) — streaming
@@ -543,6 +562,9 @@ async def startup():
         await db.users.create_index("email", unique=True)
         await db.saved_locations.create_index([("userId", 1), ("locationId", 1)])
         await db.aqi_records.create_index([("userId", 1), ("createdAt", -1)])
+        await db.aqi_notifications.create_index([("userId", 1), ("createdAt", -1)])
+        await db.aqi_notifications.create_index("eventKey", unique=True)
+        await db.aqi_alert_states.create_index("userId")
     except Exception as e:
         logger.warning(f"index creation: {e}")
     # AQI alert checks run as a scheduled one-shot worker (GitHub Actions).
