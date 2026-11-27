@@ -54,12 +54,14 @@ def assess(aqi:int,pollutants:dict,pollutant_sources:dict=None,aqi_source:dict=N
     aqi_value=max(0.0,min(500.0,float(aqi)))
     contributors_raw={}
     if sufficient:
-        aqi_norm=aqi_value/500.0
-        contributors_raw["AQI"]=aqi_norm*WEIGHTS["aqi"]
+        # Convert every US-AQI sub-index to the same app-defined 0-100 indicator
+        # scale before applying weights. This avoids treating raw index values
+        # as concentrations or mixing incompatible units.
+        contributors_raw["AQI"]=_aqi_only_score(aqi_value)*WEIGHTS["aqi"]
         for k in available:
-            contributors_raw[POLLUTANT_META[k]["name"]]=subs[k]*WEIGHTS[k]
+            contributors_raw[POLLUTANT_META[k]["name"]]=_aqi_only_score(pollutants[k])*WEIGHTS[k]
         denominator=WEIGHTS["aqi"]+sum(WEIGHTS[k] for k in available)
-        score=int(round(100*sum(contributors_raw.values())/denominator)) if denominator else 0
+        score=int(round(sum(contributors_raw.values())/denominator)) if denominator else 0
         mode="pollutant_weighted"
         mode_label="Pollutant-weighted indicator"
         top_names=[name for name,value in sorted(contributors_raw.items(),key=lambda item:item[1],reverse=True)[:2] if value>0]
