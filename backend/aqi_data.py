@@ -358,7 +358,7 @@ def current_snapshot(loc):
             return _attach_cpcb_data(_open_meteo_snapshot(loc), loc)
         except Exception as fallback_exc:
             logger.error("No usable WAQI or Open-Meteo data for %s: %s",loc.get("name"),fallback_exc)
-            return {
+            return _attach_cpcb_data({
                 "location":{"id":loc["id"],"name":loc["name"],"country":loc.get("country",""),"lat":float(loc["lat"]),"lon":float(loc["lon"])},
                 "aqi":None,"category":"Unavailable","categoryKey":"unavailable","color":"#64748B",
                 "dominantPollutant":None,"pollutants":{},"pollutantSubIndices":{},
