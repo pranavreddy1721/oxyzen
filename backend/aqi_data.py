@@ -291,16 +291,17 @@ def current_snapshot(loc):
     pollutant_sources={k:"WAQI monitoring station sub-index" for k in pollutants}
     updated=_provider_time(data)
     # Keep WAQI readings authoritative; use CAMS only to fill absent pollutant indices.
-    try:
-        model_payload=_open_meteo_payload(loc)
-        modelled,model_time=_open_meteo_pollutant_indices(model_payload,updated)
-        for pollutant,value in modelled.items():
-            if pollutant not in pollutants:
-                pollutants[pollutant]=value
-                pollutant_sources[pollutant]="Open-Meteo CAMS model estimate"
-    except Exception as exc:
-        logger.warning("Open-Meteo pollutant enrichment unavailable for %s: %s",loc.get("name"),exc)
-        model_time=None
+    model_time=None
+    if len(pollutants)<len(POLLUTANT_META):
+        try:
+            model_payload=_open_meteo_payload(loc)
+            modelled,model_time=_open_meteo_pollutant_indices(model_payload,updated)
+            for pollutant,value in modelled.items():
+                if pollutant not in pollutants:
+                    pollutants[pollutant]=value
+                    pollutant_sources[pollutant]="Open-Meteo CAMS model estimate"
+        except Exception as exc:
+            logger.warning("Open-Meteo pollutant enrichment unavailable for %s: %s",loc.get("name"),exc)
     cat=category_for_aqi(aqi)
     source=_source(data)
     source.update({
@@ -308,7 +309,7 @@ def current_snapshot(loc):
         "distanceKm":round(distance,1),
         "matchType":"direct" if distance<=5 else "nearby",
         "dataType":"WAQI ground monitoring station",
-        "pollutantModelTime":model_time if "model_time" in locals() else None,
+        "pollutantModelTime":model_time,
     })
     return {
         "location":{"id":loc["id"],"name":loc["name"],"country":loc.get("country",""),"lat":float(loc["lat"]),"lon":float(loc["lon"])},
