@@ -542,13 +542,13 @@ async def startup():
         await db.aqi_records.create_index([("userId", 1), ("createdAt", -1)])
     except Exception as e:
         logger.warning(f"index creation: {e}")
-    # Start the optional AQI alert monitor only when email delivery is configured.
-    if os.environ.get("RESEND_API_KEY") and os.environ.get("ALERT_FROM_EMAIL"):
-        from alert_worker import monitor_loop
+    # Start the optional AQI alert monitor only when Brevo delivery is configured.
+    from alert_worker import is_email_configured, monitor_loop
+    if is_email_configured():
         app.state.alert_monitor_task = asyncio.create_task(monitor_loop(db, logger))
     else:
         app.state.alert_monitor_task = None
-        logger.info("AQI email monitoring is disabled; configure RESEND_API_KEY and ALERT_FROM_EMAIL to enable it.")
+        logger.info("AQI email monitoring is disabled; configure BREVO_API_KEY and BREVO_SENDER_EMAIL to enable it.")
 
     # seed admin
     admin_email = os.environ.get("ADMIN_EMAIL", "admin@oxyzen.app")
