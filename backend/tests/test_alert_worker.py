@@ -103,7 +103,7 @@ def test_check_user_checks_every_saved_location_and_records_transitions(monkeypa
 
     assert calls == ["Delhi", "Mumbai"]
     assert db.aqi_alert_states.docs["user-1:delhi-id"]["state"] == "above"
-    assert db.aqi_alert_states.docs["user-1:mumbai-id"]["state"] == "clear"
+    assert "user-1:mumbai-id" not in db.aqi_alert_states.docs
     assert any(d.get("locationName") == "Delhi" for d in db.aqi_notifications.inserted)
 
 
