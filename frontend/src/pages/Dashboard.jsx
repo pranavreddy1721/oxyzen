@@ -188,7 +188,7 @@ export default function Dashboard() {
               <h2 className="font-heading text-lg font-bold">AQI Alerts</h2>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-sm">Enable email alerts</span>
+              <span className="text-sm">Enable AQI notifications</span>
               <Switch checked={enabled} onCheckedChange={setEnabled} data-testid="alert-toggle" />
             </div>
             <div className="mt-5 border-t border-border pt-5">
@@ -209,7 +209,7 @@ export default function Dashboard() {
                 <span className="font-data text-lg font-bold text-primary">{threshold}</span>
               </div>
               <Slider value={[threshold]} min={50} max={300} step={10} onValueChange={(v) => setThreshold(v[0])} data-testid="alert-slider" />
-              <p className="mt-2 text-xs text-muted-foreground">You'll receive an email when monitored AQI reaches this level. Default: 150.</p>
+              <p className="mt-2 text-xs text-muted-foreground">You'll receive an email and dashboard notification when a saved location reaches this AQI. Default: 150.</p>
             </div>
             <Button className="mt-6 w-full" onClick={saveAlerts} data-testid="save-alerts-btn">Save preferences</Button>
           </div>
