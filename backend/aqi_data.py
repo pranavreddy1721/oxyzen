@@ -119,8 +119,39 @@ def _subindices(data):
 def _source(data):
  city=data.get("city") or {};attrs=data.get("attributions") or [];origin=attrs[0] if attrs else {}
  return {"provider":"World Air Quality Index (WAQI)","providerUrl":"https://waqi.info/","station":city.get("name") or "WAQI station","stationUrl":city.get("url") or "","origin":origin.get("name") or "","originUrl":origin.get("url") or ""}
+def _provider_time(data):
+    stamp = data.get("time") or {}
+    raw_iso = stamp.get("iso")
+    raw_epoch = stamp.get("s")
+    tz_hint = stamp.get("tz")
+    if raw_iso:
+        try:
+            parsed = datetime.fromisoformat(str(raw_iso).replace("Z", "+00:00"))
+            if parsed.tzinfo is None and tz_hint:
+                try:
+                    from zoneinfo import ZoneInfo
+                    parsed = parsed.replace(tzinfo=ZoneInfo(str(tz_hint)))
+                except Exception:
+                    import re
+                    match = re.fullmatch(r"([+-])(\\d{2}):?(\\d{2})", str(tz_hint).strip())
+                    if match:
+                        minutes = (int(match.group(2)) * 60 + int(match.group(3))) * (1 if match.group(1) == "+" else -1)
+                        from datetime import timedelta
+                        parsed = parsed.replace(tzinfo=timezone(timedelta(minutes=minutes)))
+            if parsed.tzinfo is not None:
+                return parsed.astimezone(timezone.utc).isoformat()
+            logger.warning("WAQI timestamp has no timezone; rejecting ambiguous local timestamp: %s", raw_iso)
+        except (TypeError, ValueError, OverflowError):
+            logger.warning("Could not parse WAQI ISO timestamp: %s", raw_iso)
+    if raw_epoch is not None:
+        try:
+            return datetime.fromtimestamp(float(raw_epoch), tz=timezone.utc).isoformat()
+        except (TypeError, ValueError, OverflowError, OSError):
+            logger.warning("Could not parse WAQI epoch timestamp: %s", raw_epoch)
+    return None
+
 def current_snapshot(loc):
- data,distance,slat,slon=_resolve_feed(loc);aqi=max(0,min(500,int(round(float(data["aqi"])))));sub=_subindices(data);cat=category_for_aqi(aqi);updated=((data.get("time") or {}).get("iso") or (data.get("time") or {}).get("s"));source=_source(data);source.update({"stationLat":slat,"stationLon":slon,"distanceKm":round(distance,1),"matchType":"direct" if distance<=5 else "nearby","dataType":"Direct monitoring station" if distance<=5 else "Nearby/associated monitoring station"});return {"location":{"id":loc["id"],"name":loc["name"],"country":loc.get("country",""),"lat":float(loc["lat"]),"lon":float(loc["lon"])},"aqi":aqi,"category":cat["label"],"categoryKey":cat["key"],"color":cat["color"],"dominantPollutant":data.get("dominentpol"),"pollutants":sub,"pollutantSubIndices":sub,"updatedAt":updated or datetime.now(timezone.utc).isoformat(),"providerUpdatedAt":updated,"source":source}
+ data,distance,slat,slon=_resolve_feed(loc);aqi=max(0,min(500,int(round(float(data["aqi"])))));sub=_subindices(data);cat=category_for_aqi(aqi);updated=_provider_time(data);source=_source(data);source.update({"stationLat":slat,"stationLon":slon,"distanceKm":round(distance,1),"matchType":"direct" if distance<=5 else "nearby","dataType":"Direct monitoring station" if distance<=5 else "Nearby/associated monitoring station"});return {"location":{"id":loc["id"],"name":loc["name"],"country":loc.get("country",""),"lat":float(loc["lat"]),"lon":float(loc["lon"])},"aqi":aqi,"category":cat["label"],"categoryKey":cat["key"],"color":cat["color"],"dominantPollutant":data.get("dominentpol"),"pollutants":sub,"pollutantSubIndices":sub,"updatedAt":updated,"providerUpdatedAt":updated,"source":source}
 def history(loc,kind="24h"): return []
 def forecast(loc,days=5):
  try:
