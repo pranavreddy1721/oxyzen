@@ -29,6 +29,11 @@ export default function Dashboard() {
     setEnabled(data.alertsEnabled);
     setMonitoringEnabled(data.monitoringEnabled ?? false);
     setMonitorLocation(data.monitorLocationName ?? "");
+    setMonitorCoords(
+      Number.isFinite(data.monitorLat) && Number.isFinite(data.monitorLon)
+        ? { lat: data.monitorLat, lon: data.monitorLon }
+        : null
+    );
   }).catch(() => {});
 
   useEffect(() => { load(); }, []);
@@ -53,6 +58,7 @@ export default function Dashboard() {
         payload.monitorLat = monitorCoords.lat;
         payload.monitorLon = monitorCoords.lon;
         payload.monitorLocationName = monitorLocation;
+        payload.monitorLocationCountry = data.monitorLocationCountry || "";
       }
       const { data } = await api.patch("/auth/alerts", payload);
       updateUser(data.user);
