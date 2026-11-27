@@ -15,6 +15,13 @@ export default function HealthRiskCard({ risk }) {
     );
   }
   const c = risk.riskColor;
+  const sourceValues = Object.values(risk.pollutantSources || {});
+  const hasWaqi = sourceValues.some((value) => value.includes("WAQI"));
+  const hasModel = sourceValues.some((value) => value.includes("Open-Meteo"));
+  const sourceLabel = hasWaqi && hasModel ? "WAQI station + Open-Meteo model"
+    : hasWaqi ? "WAQI station measurements"
+    : hasModel ? "Open-Meteo model estimates"
+    : "Overall US AQI only";
 
   return (
     <div className="rounded-xl border border-border bg-card p-8" data-testid="health-risk-card">
@@ -64,7 +71,7 @@ export default function HealthRiskCard({ risk }) {
           </p>
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground" data-testid="risk-data-quality">
             <span>Pollutant data: {risk.dataCompleteness?.available ?? 0}/{risk.dataCompleteness?.total ?? 6} available ({risk.dataCompleteness?.percentage ?? 0}%)</span>
-            <span>Sources: {risk.scoreMode === "aqi_only" ? "Overall US AQI only" : "WAQI station + Open-Meteo model where needed"}</span>
+            <span>Sources: {sourceLabel}</span>
           </div>
           {risk.scoreMode === "aqi_only" && (
             <p className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-xs text-muted-foreground">
