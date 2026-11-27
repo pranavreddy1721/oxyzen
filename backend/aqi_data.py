@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 import requests
 logger=logging.getLogger("oxyzen.aqi_data")
 WAQI_BASE="https://api.waqi.info"; GEOCODING_URL="https://geocoding-api.open-meteo.com/v1/search"
-_EXTERNAL_LOCATIONS={}; _GEOCODE_CACHE={}; _GEOCODE_CACHE_TTL=600; MAX_STATION_DISTANCE_KM=100.0
+_EXTERNAL_LOCATIONS={}; _GEOCODE_CACHE={}; _GEOCODE_CACHE_TTL=600; _OPEN_METEO_CACHE={}; MAX_STATION_DISTANCE_KM=100.0
 WAQI_STATIONS={"kolhapur":["A567994","A567991"],"sangli":["A568009"]}
 CITIES=[{"id":"delhi","name":"Delhi","country":"India","lat":28.6139,"lon":77.2090},{"id":"mumbai","name":"Mumbai","country":"India","lat":19.076,"lon":72.8777},{"id":"sangli","name":"Sangli","country":"India","lat":16.8524,"lon":74.5815},{"id":"kolhapur","name":"Kolhapur","country":"India","lat":16.705,"lon":74.2433},{"id":"pune","name":"Pune","country":"India","lat":18.5204,"lon":73.8567},{"id":"bengaluru","name":"Bengaluru","country":"India","lat":12.9716,"lon":77.5946},{"id":"kolkata","name":"Kolkata","country":"India","lat":22.5726,"lon":88.3639},{"id":"beijing","name":"Beijing","country":"China","lat":39.9042,"lon":116.4074},{"id":"shanghai","name":"Shanghai","country":"China","lat":31.2304,"lon":121.4737},{"id":"lahore","name":"Lahore","country":"Pakistan","lat":31.5204,"lon":74.3587},{"id":"dhaka","name":"Dhaka","country":"Bangladesh","lat":23.8103,"lon":90.4125},{"id":"london","name":"London","country":"United Kingdom","lat":51.5074,"lon":-0.1278},{"id":"paris","name":"Paris","country":"France","lat":48.8566,"lon":2.3522},{"id":"newyork","name":"New York","country":"United States","lat":40.7128,"lon":-74.006},{"id":"losangeles","name":"Los Angeles","country":"United States","lat":34.0522,"lon":-118.2437},{"id":"tokyo","name":"Tokyo","country":"Japan","lat":35.6762,"lon":139.6503},{"id":"seoul","name":"Seoul","country":"South Korea","lat":37.5665,"lon":126.978},{"id":"sydney","name":"Sydney","country":"Australia","lat":-33.8688,"lon":151.2093},{"id":"zurich","name":"Zurich","country":"Switzerland","lat":47.3769,"lon":8.5417},{"id":"cairo","name":"Cairo","country":"Egypt","lat":30.0444,"lon":31.2357},{"id":"saopaulo","name":"São Paulo","country":"Brazil","lat":-23.5505,"lon":-46.6333},{"id":"mexicocity","name":"Mexico City","country":"Mexico","lat":19.4326,"lon":-99.1332},{"id":"dubai","name":"Dubai","country":"UAE","lat":25.2048,"lon":55.2708},{"id":"singapore","name":"Singapore","country":"Singapore","lat":1.3521,"lon":103.8198},{"id":"reykjavik","name":"Reykjavik","country":"Iceland","lat":64.1466,"lon":-21.9426}]
 POLLUTANT_META={k:{"key":k,"name":n,"unit":"AQI sub-index","reference":100,"full_name":f,"short":f"WAQI pollutant AQI sub-index for {f.lower()}.","what":"This value is a WAQI pollutant AQI sub-index, not a concentration measurement.","sources":[],"effects":[],"precautions":[]} for k,n,f in [("pm25","PM2.5","fine particulate matter"),("pm10","PM10","coarse particulate matter"),("o3","O₃","ground-level ozone"),("no2","NO₂","nitrogen dioxide"),("so2","SO₂","sulfur dioxide"),("co","CO","carbon monoxide") ]}
@@ -167,16 +167,72 @@ def _provider_time(data):
             logger.warning("Could not parse WAQI epoch timestamp: %s", raw_epoch)
     return None
 
-def _open_meteo_snapshot(loc):
+OPEN_METEO_AQI_FIELDS={
+ "pm25":"us_aqi_pm2_5","pm10":"us_aqi_pm10","o3":"us_aqi_ozone",
+ "no2":"us_aqi_nitrogen_dioxide","so2":"us_aqi_sulphur_dioxide",
+ "co":"us_aqi_carbon_monoxide",
+}
+
+def _open_meteo_payload(loc):
+    key=(round(float(loc["lat"]),3),round(float(loc["lon"]),3))
+    cached=_OPEN_METEO_CACHE.get(key)
+    now=time.monotonic()
+    if cached and now-cached[0]<600:
+        return cached[1]
     url="https://air-quality-api.open-meteo.com/v1/air-quality"
     response=requests.get(url,params={
         "latitude":float(loc["lat"]),
         "longitude":float(loc["lon"]),
-        "current":"us_aqi",
-        "timezone":"auto",
+        "current":"us_aqi,pm2_5,pm10,ozone,nitrogen_dioxide,sulphur_dioxide,carbon_monoxide",
+        "hourly":",".join(OPEN_METEO_AQI_FIELDS.values()),
+        "past_hours":2,
+        "forecast_hours":1,
+        "timezone":"UTC",
     },timeout=10)
     response.raise_for_status()
     payload=response.json()
+    _OPEN_METEO_CACHE[key]=(now,payload)
+    return payload
+
+def _open_meteo_pollutant_indices(payload,target_time):
+    """Return CAMS modelled US-AQI sub-indices nearest the requested timestamp."""
+    hourly=payload.get("hourly") or {}
+    times=hourly.get("time") or []
+    if not times:
+        return {},None
+    try:
+        target=datetime.fromisoformat(str(target_time).replace("Z","+00:00"))
+        if target.tzinfo is None: target=target.replace(tzinfo=timezone.utc)
+        target=target.astimezone(timezone.utc)
+    except (TypeError,ValueError):
+        return {},None
+    nearest=None
+    for index,raw in enumerate(times):
+        try:
+            stamp=datetime.fromisoformat(str(raw).replace("Z","+00:00"))
+            if stamp.tzinfo is None: stamp=stamp.replace(tzinfo=timezone.utc)
+            delta=abs((stamp.astimezone(timezone.utc)-target).total_seconds())
+            if nearest is None or delta<nearest[0]: nearest=(delta,index,stamp)
+        except (TypeError,ValueError):
+            continue
+    if nearest is None or nearest[0]>5400:
+        logger.warning("Open-Meteo pollutant index time is not aligned with AQI timestamp")
+        return {},None
+    _,index,stamp=nearest
+    result={}
+    for pollutant,field in OPEN_METEO_AQI_FIELDS.items():
+        values=hourly.get(field) or []
+        if index>=len(values): continue
+        try:
+            value=float(values[index])
+            if math.isfinite(value) and value>=0:
+                result[pollutant]=round(value,1)
+        except (TypeError,ValueError):
+            continue
+    return result,stamp.astimezone(timezone.utc).isoformat()
+
+def _open_meteo_snapshot(loc):
+    payload=_open_meteo_payload(loc)
     current=payload.get("current") or {}
     raw_aqi=current.get("us_aqi")
     stamp=current.get("time")
@@ -184,14 +240,15 @@ def _open_meteo_snapshot(loc):
         raise RuntimeError("Open-Meteo did not return a current US AQI reading")
     updated=datetime.fromisoformat(str(stamp).replace("Z","+00:00"))
     if updated.tzinfo is None:
-        from datetime import timedelta
-        updated=updated.replace(tzinfo=timezone(timedelta(seconds=int(payload.get("utc_offset_seconds",0)))))
+        updated=updated.replace(tzinfo=timezone.utc)
     now=datetime.now(timezone.utc)
     age=(now-updated.astimezone(timezone.utc)).total_seconds()
     if age < -900 or age > 10800:
         raise RuntimeError(f"Open-Meteo current AQI timestamp is outside freshness window (age_seconds={age:.0f})")
     aqi=max(0,min(500,int(round(float(raw_aqi)))))
     cat=category_for_aqi(aqi)
+    pollutants,index_time=_open_meteo_pollutant_indices(payload,updated)
+    pollutant_sources={k:"Open-Meteo CAMS model estimate" for k in pollutants}
     source={
         "provider":"Open-Meteo CAMS Air Quality",
         "providerUrl":"https://open-meteo.com/en/docs/air-quality-api",
@@ -200,20 +257,59 @@ def _open_meteo_snapshot(loc):
         "stationLon":payload.get("longitude"),
         "distanceKm":round(_distance_km(float(loc["lat"]),float(loc["lon"]),float(payload.get("latitude",loc["lat"])),float(payload.get("longitude",loc["lon"]))),1),
         "matchType":"model",
-        "dataType":"Modelled current US AQI (not a ground monitoring station)",
+        "dataType":"Modelled current US AQI and pollutant sub-indices (not a ground monitoring station)",
+        "pollutantIndexTime":index_time,
     }
-    logger.info("Using fresh Open-Meteo US AQI fallback for %s: AQI=%s updated=%s",loc.get("name"),aqi,updated.isoformat())
-    return {"location":{"id":loc["id"],"name":loc["name"],"country":loc.get("country",""),"lat":float(loc["lat"]),"lon":float(loc["lon"])},"aqi":aqi,"category":cat["label"],"categoryKey":cat["key"],"color":cat["color"],"dominantPollutant":None,"pollutants":{},"pollutantSubIndices":{},"updatedAt":updated.isoformat(),"providerUpdatedAt":updated.isoformat(),"source":source}
+    logger.info("Using fresh Open-Meteo fallback for %s: AQI=%s pollutant_indices=%s",loc.get("name"),aqi,sorted(pollutants))
+    return {
+        "location":{"id":loc["id"],"name":loc["name"],"country":loc.get("country",""),"lat":float(loc["lat"]),"lon":float(loc["lon"])},
+        "aqi":aqi,"category":cat["label"],"categoryKey":cat["key"],"color":cat["color"],
+        "dominantPollutant":None,"pollutants":pollutants,"pollutantSubIndices":pollutants,
+        "pollutantDataSources":pollutant_sources,"updatedAt":updated.isoformat(),
+        "providerUpdatedAt":updated.isoformat(),"source":source,
+    }
 
 def current_snapshot(loc):
- try:
-  data,distance,slat,slon=_resolve_feed(loc)
- except Exception as exc:
-  if not os.environ.get("WAQI_TOKEN","").strip():
-   raise
-  logger.warning("No fresh WAQI station for %s; trying Open-Meteo current US AQI fallback: %s",loc.get("name"),exc)
-  return _open_meteo_snapshot(loc)
- aqi=max(0,min(500,int(round(float(data["aqi"])))));sub=_subindices(data);cat=category_for_aqi(aqi);updated=_provider_time(data);source=_source(data);source.update({"stationLat":slat,"stationLon":slon,"distanceKm":round(distance,1),"matchType":"direct" if distance<=5 else "nearby","dataType":"Direct monitoring station" if distance<=5 else "Nearby/associated monitoring station"});return {"location":{"id":loc["id"],"name":loc["name"],"country":loc.get("country",""),"lat":float(loc["lat"]),"lon":float(loc["lon"])},"aqi":aqi,"category":cat["label"],"categoryKey":cat["key"],"color":cat["color"],"dominantPollutant":data.get("dominentpol"),"pollutants":sub,"pollutantSubIndices":sub,"updatedAt":updated,"providerUpdatedAt":updated,"source":source}
+    try:
+        data,distance,slat,slon=_resolve_feed(loc)
+    except Exception as exc:
+        if not os.environ.get("WAQI_TOKEN","").strip():
+            raise
+        logger.warning("No fresh WAQI station for %s; trying Open-Meteo current AQI and pollutant fallback: %s",loc.get("name"),exc)
+        return _open_meteo_snapshot(loc)
+
+    aqi=max(0,min(500,int(round(float(data["aqi"])))))
+    pollutants=_subindices(data)
+    pollutant_sources={k:"WAQI monitoring station sub-index" for k in pollutants}
+    updated=_provider_time(data)
+    # Keep WAQI readings authoritative; use CAMS only to fill absent pollutant indices.
+    try:
+        model_payload=_open_meteo_payload(loc)
+        modelled,model_time=_open_meteo_pollutant_indices(model_payload,updated)
+        for pollutant,value in modelled.items():
+            if pollutant not in pollutants:
+                pollutants[pollutant]=value
+                pollutant_sources[pollutant]="Open-Meteo CAMS model estimate"
+    except Exception as exc:
+        logger.warning("Open-Meteo pollutant enrichment unavailable for %s: %s",loc.get("name"),exc)
+        model_time=None
+    cat=category_for_aqi(aqi)
+    source=_source(data)
+    source.update({
+        "stationLat":slat,"stationLon":slon,
+        "distanceKm":round(distance,1),
+        "matchType":"direct" if distance<=5 else "nearby",
+        "dataType":"WAQI ground monitoring station",
+        "pollutantModelTime":model_time if "model_time" in locals() else None,
+    })
+    return {
+        "location":{"id":loc["id"],"name":loc["name"],"country":loc.get("country",""),"lat":float(loc["lat"]),"lon":float(loc["lon"])},
+        "aqi":aqi,"category":cat["label"],"categoryKey":cat["key"],"color":cat["color"],
+        "dominantPollutant":data.get("dominentpol"),
+        "pollutants":pollutants,"pollutantSubIndices":pollutants,
+        "pollutantDataSources":pollutant_sources,
+        "updatedAt":updated,"providerUpdatedAt":updated,"source":source,
+    }
 def history(loc,kind="24h"): return []
 def forecast(loc,days=5):
  try:
