@@ -5,6 +5,7 @@ load_dotenv(ROOT_DIR / ".env")
 
 import os
 import logging
+import asyncio
 from datetime import datetime, timezone
 from typing import List, Optional
 
@@ -77,8 +78,13 @@ class ChatInput(BaseModel):
 
 
 class AlertPrefInput(BaseModel):
-    threshold: int = 150
-    enabled: bool = True
+    threshold: Optional[int] = None
+    enabled: Optional[bool] = None
+    monitoringEnabled: Optional[bool] = None
+    monitorLat: Optional[float] = None
+    monitorLon: Optional[float] = None
+    monitorLocationName: Optional[str] = None
+    monitorLocationCountry: Optional[str] = None
 
 
 # ---------------------------------------------------------------------------
@@ -92,6 +98,8 @@ def _public_user(u: dict) -> dict:
         "role": u.get("role", "user"),
         "alertThreshold": u.get("alertThreshold", 150),
         "alertsEnabled": u.get("alertsEnabled", True),
+        "monitoringEnabled": u.get("monitoringEnabled", False),
+        "monitorLocationName": u.get("monitorLocationName", ""),
         "createdAt": u.get("created_at").isoformat() if isinstance(u.get("created_at"), datetime) else u.get("created_at"),
     }
 
@@ -143,6 +151,8 @@ async def register(body: RegisterInput, response: Response):
         "role": "user",
         "alertThreshold": 150,
         "alertsEnabled": True,
+        "monitoringEnabled": False,
+        "monitorState": "clear",
         "created_at": datetime.now(timezone.utc),
     }
     res = await db.users.insert_one(doc)
@@ -201,10 +211,19 @@ async def refresh_token_route(request: Request, response: Response):
 
 @api.patch("/auth/alerts")
 async def update_alerts(body: AlertPrefInput, user: dict = Depends(get_current_user)):
-    await db.users.update_one(
-        {"_id": user["_id"]},
-        {"$set": {"alertThreshold": body.threshold, "alertsEnabled": body.enabled}},
-    )
+    updates = body.model_dump(exclude_unset=True)
+    if "threshold" in updates:
+        if updates["threshold"] is None or not 50 <= updates["threshold"] <= 500:
+            raise HTTPException(status_code=422, detail="Threshold must be between 50 and 500.")
+        updates["alertThreshold"] = updates.pop("threshold")
+    if "enabled" in updates:
+        updates["alertsEnabled"] = updates.pop("enabled")
+    if "monitoringEnabled" in updates and updates["monitoringEnabled"]:
+        if updates.get("monitorLat") is None:
+            raise HTTPException(status_code=422, detail="Current location coordinates are required to enable monitoring.")
+    if updates:
+        updates["updatedAt"] = datetime.now(timezone.utc).isoformat()
+        await db.users.update_one({"_id": user["_id"]}, {"$set": updates})
     updated = await db.users.find_one({"_id": user["_id"]})
     return {"user": _public_user(updated)}
 
@@ -413,7 +432,9 @@ async def dashboard(user: dict = Depends(get_current_user)):
     recent = await db.aqi_records.find({"userId": uid}).sort("createdAt", -1).limit(8).to_list(8)
     recent_out = [{"locationName": r["locationName"], "aqi": r["aqi"], "category": r["category"], "createdAt": r["createdAt"]} for r in recent]
     return {"savedLocations": locations, "recentSearches": recent_out,
-            "alertThreshold": user.get("alertThreshold", 150), "alertsEnabled": user.get("alertsEnabled", True)}
+            "alertThreshold": user.get("alertThreshold", 150), "alertsEnabled": user.get("alertsEnabled", True),
+            "monitoringEnabled": user.get("monitoringEnabled", False),
+            "monitorLocationName": user.get("monitorLocationName", "")}
 
 
 # ---------------------------------------------------------------------------
@@ -521,6 +542,14 @@ async def startup():
         await db.aqi_records.create_index([("userId", 1), ("createdAt", -1)])
     except Exception as e:
         logger.warning(f"index creation: {e}")
+    # Start the optional AQI alert monitor only when email delivery is configured.
+    if os.environ.get("RESEND_API_KEY") and os.environ.get("ALERT_FROM_EMAIL"):
+        from alert_worker import monitor_loop
+        app.state.alert_monitor_task = asyncio.create_task(monitor_loop(db, logger))
+    else:
+        app.state.alert_monitor_task = None
+        logger.info("AQI email monitoring is disabled; configure RESEND_API_KEY and ALERT_FROM_EMAIL to enable it.")
+
     # seed admin
     admin_email = os.environ.get("ADMIN_EMAIL", "admin@oxyzen.app")
     admin_password = os.environ.get("ADMIN_PASSWORD", "OxyZen@2026")
@@ -530,6 +559,7 @@ async def startup():
             "name": "Admin", "email": admin_email,
             "password_hash": hash_password(admin_password), "role": "admin",
             "alertThreshold": 150, "alertsEnabled": True,
+            "monitoringEnabled": False, "monitorState": "clear",
             "created_at": datetime.now(timezone.utc),
         })
         logger.info("seeded admin user")
@@ -539,4 +569,11 @@ async def startup():
 
 @app.on_event("shutdown")
 async def shutdown():
+    task = getattr(app.state, "alert_monitor_task", None)
+    if task:
+        task.cancel()
+        try:
+            await task
+        except asyncio.CancelledError:
+            pass
     client.close()
