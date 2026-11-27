@@ -86,15 +86,27 @@ def _known_station_ids(loc):
   if "sangli" in candidate:return WAQI_STATIONS["sangli"]
  return []
 def _resolve_feed(loc):
+ name=(loc.get("name") or "").strip()
+ now=datetime.now(timezone.utc)
+ def fresh(result, station_label):
+  if not result:return False
+  updated=_provider_time(result[0])
+  if updated is None:
+   logger.warning("Skipping WAQI station %s: timestamp missing or invalid",station_label)
+   return False
+  age=(now-updated).total_seconds()
+  if age < -300 or age > 7200:
+   logger.warning("Skipping stale/future WAQI station %s: updated=%s age_seconds=%.0f",station_label,updated.isoformat(),age)
+   return False
+  return True
  for sid in _known_station_ids(loc):
   result=_fetch_feed(loc,f"/feed/{sid}/",enforce_distance=False)
-  if result:return result
- name=(loc.get("name") or "").strip()
+  if fresh(result,sid):return result
  if name:
   result=_fetch_feed(loc,f"/feed/{name}/")
-  if result:return result
+  if fresh(result,name):return result
  result=_fetch_feed(loc,f"/feed/geo:{float(loc['lat'])};{float(loc['lon'])}/")
- if result:return result
+ if fresh(result,"geographic lookup"):return result
  lat,lon=float(loc["lat"]),float(loc["lon"]); bounds=f"{lat-1.0},{lon-1.0},{lat+1.0},{lon+1.0}"
  try:stations=_waqi_json("/map/bounds/",{"latlng":bounds})
  except Exception as exc: logger.warning("WAQI map lookup failed for %s: %s",name,exc); stations=[]
@@ -108,8 +120,8 @@ def _resolve_feed(loc):
   except (KeyError,TypeError,ValueError):continue
  for _,uid,slat,slon in sorted(candidates,key=lambda x:x[0]):
   result=_fetch_feed(loc,f"/feed/@{uid}/",fallback_coords=(slat,slon))
-  if result:return result
- raise RuntimeError(f"No usable WAQI station within {MAX_STATION_DISTANCE_KM:.0f} km of {name or 'selected location'}")
+  if fresh(result,uid):return result
+ raise RuntimeError(f"No fresh WAQI station within {MAX_STATION_DISTANCE_KM:.0f} km of {name or 'selected location'}")
 def _subindices(data):
  iaqi=data.get("iaqi") or {};out={}
  for k in POLLUTANT_META:
