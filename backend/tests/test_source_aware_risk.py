@@ -73,3 +73,29 @@ def test_pollutant_provenance_is_returned_for_explanation():
     result = health_risk.assess(107, {"pm25": 107, "pm10": 107}, sources, {"provider": "WAQI"})
     assert result["pollutantSources"] == sources
     assert result["aqiSource"]["provider"] == "WAQI"
+
+
+
+def test_data_completeness_distinguishes_station_and_modelled_sources():
+    pollutants = {
+        "pm25": 107, "pm10": 35, "o3": 78,
+        "no2": 2, "so2": 3, "co": 2,
+    }
+    model_sources = {key: "Open-Meteo CAMS model estimate" for key in pollutants}
+    model_result = health_risk.assess(107, pollutants, model_sources)
+    assert model_result["dataCompleteness"]["available"] == 6
+    assert model_result["dataCompleteness"]["stationMeasurements"] == 0
+    assert model_result["dataCompleteness"]["modelledEstimates"] == 6
+
+    mixed_sources = dict(model_sources)
+    mixed_sources["pm25"] = "WAQI monitoring station sub-index"
+    mixed_result = health_risk.assess(107, pollutants, mixed_sources)
+    assert mixed_result["dataCompleteness"]["stationMeasurements"] == 1
+    assert mixed_result["dataCompleteness"]["modelledEstimates"] == 5
+
+
+def test_unknown_source_is_not_mislabelled_as_station_or_model():
+    result = health_risk.assess(107, {"pm25": 107, "pm10": 35}, {})
+    assert result["dataCompleteness"]["stationMeasurements"] == 0
+    assert result["dataCompleteness"]["modelledEstimates"] == 0
+    assert result["dataCompleteness"]["unclassified"] == 2
