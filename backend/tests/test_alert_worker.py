@@ -40,15 +40,18 @@ class _Collection:
         return self.docs.get(query["_id"])
 
     async def update_one(self, query, update, upsert=False):
-        key = query.get("_id")
+        key = query.get("_id") or query.get("eventKey")
         existing = self.docs.get(key)
-        if existing is None and upsert:
+        is_new = existing is None
+        if is_new and upsert:
             existing = {"_id": key}
             self.docs[key] = existing
         if existing is not None:
             existing.update(update.get("$set", {}))
-            if "$setOnInsert" in update and len(existing) == 1:
+            if "$setOnInsert" in update and is_new:
                 existing.update(update["$setOnInsert"])
+            if is_new:
+                self.values.append(existing)
             self.inserted.append(dict(existing))
         return None
 
