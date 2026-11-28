@@ -42,10 +42,7 @@ export default function AQIMonitor() {
       setForecast(fc.data.forecast);
     } catch (e) {
       const detail = e?.response?.data?.detail;
-      setErrorMessage(
-        detail ||
-        "Live WAQI data is currently unavailable for " + location.name + ". There may be no nearby WAQI monitoring station available for this location."
-      );
+      setErrorMessage(detail || "Live WAQI data is currently unavailable for " + location.name + ". There may be no nearby WAQI monitoring station available for this location.");
       setError(true);
     }
   }, [location]);
@@ -74,21 +71,20 @@ export default function AQIMonitor() {
   };
 
   return (
-    <main className="dark min-h-screen bg-[#070b0a] text-slate-100" data-testid="aqi-monitor-page">
-      <div className="mx-auto max-w-[1600px] px-3 py-5 sm:px-5 lg:px-7">
-        <div className="mb-5 flex flex-col gap-3 xl:flex-row xl:items-center">
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-emerald-400">
-              <Wind className="h-4 w-4" /> OxyZen Air Intelligence
-            </div>
-            <h1 className="mt-1 font-heading text-2xl font-black tracking-tight text-white sm:text-3xl">AQI Monitor</h1>
-            <p className="mt-1 text-sm text-slate-400">Real-time air quality, pollutant analysis and environmental health insights.</p>
-          </div>
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center xl:w-[min(720px,62%)]">
+    <main className="dark min-h-screen bg-[#050a09] text-slate-100" data-testid="aqi-monitor-page">
+      <div className="mx-auto w-full max-w-[1560px] px-4 py-5 sm:px-6 lg:px-7">
+        <div className="mb-5 flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+          <div className="flex min-w-0 flex-1 items-center gap-3">
             <div className="min-w-0 flex-1"><LocationSearch onSelect={setLocation} /></div>
-            <Button variant={saved ? "secondary" : "outline"} onClick={saveLocation} data-testid="save-location-btn" className="h-11 shrink-0 border-emerald-500/40 bg-emerald-500/5 text-emerald-300 hover:bg-emerald-500/10">
-              {saved ? <BookmarkCheck className="mr-2 h-4 w-4" strokeWidth={1.5} /> : <Bookmark className="mr-2 h-4 w-4" strokeWidth={1.5} />}
-              {saved ? "Saved location" : "Save location"}
+            <Button variant="outline" onClick={() => window.dispatchEvent(new Event("oxyzen-use-location"))} className="hidden h-11 shrink-0 border-emerald-400/50 bg-emerald-400/5 text-white hover:bg-emerald-400/10 sm:inline-flex">
+              <Wind className="mr-2 h-4 w-4 text-emerald-400" /> Use My Location
+            </Button>
+          </div>
+          <div className="flex items-center justify-between gap-3 xl:justify-end">
+            <p className="text-xs font-data text-slate-400">{current?.updatedAt ? "Last updated: " + new Date(current.updatedAt).toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"}) : "Live air-quality monitoring"}</p>
+            <Button variant={saved ? "secondary" : "outline"} onClick={saveLocation} data-testid="save-location-btn" className="h-10 shrink-0 border-emerald-400/50 bg-emerald-400/5 text-emerald-300 hover:bg-emerald-400/10">
+              {saved ? <BookmarkCheck className="mr-2 h-4 w-4" /> : <Bookmark className="mr-2 h-4 w-4" />}
+              {saved ? "Saved" : "Save location"}
             </Button>
           </div>
         </div>
@@ -102,25 +98,23 @@ export default function AQIMonitor() {
           </div>
         ) : (
           <>
-            <div className="mb-5 grid grid-cols-1 items-stretch gap-5 lg:grid-cols-12">
-              <section className="min-h-[620px] lg:col-span-4 lg:row-span-2" aria-label="Current air quality">
+            <div className="grid grid-cols-1 items-stretch gap-5 lg:grid-cols-12">
+              <section className="lg:col-span-4" aria-label="Current air quality">
                 <AQICard {...current} locationName={current.location.name} aqiScale={current.aqiScale} />
               </section>
-              <section className="lg:col-span-8" aria-label="Environmental health impact">
+              <section className="space-y-4 lg:col-span-8" aria-label="Environmental health impact">
                 <HealthRiskCard risk={risk} />
-              </section>
-              <section className="lg:col-span-8" aria-label="Air quality index scale">
                 <AQIScale aqi={current.aqi} aqiScale={current.aqiScale} />
               </section>
             </div>
 
             {current.officialStationData && (
-              <section className="mb-5" aria-label="Official monitoring station observations">
+              <section className="mt-5" aria-label="Official monitoring station observations">
                 <OfficialStationData data={current.officialStationData} />
               </section>
             )}
 
-            <section className="mb-5 rounded-2xl border border-emerald-500/20 bg-[#0c1412] p-4 sm:p-5" aria-label="Pollutant analysis">
+            <section className="mt-5 rounded-2xl border border-emerald-400/25 bg-[#081512] p-4 sm:p-5" aria-label="Pollutant analysis">
               <div className="mb-4 flex items-center gap-2">
                 <Activity className="h-5 w-5 text-emerald-400" />
                 <div>
@@ -131,14 +125,14 @@ export default function AQIMonitor() {
               <PollutantGrid pollutants={current.pollutants} meta={current.pollutantMeta} location={current.location} sources={current.pollutantDataSources} aqiScale={current.aqiScale} />
             </section>
 
-            <div className="mb-5 grid grid-cols-1 gap-5 xl:grid-cols-2">
+            <div className="mt-5 grid grid-cols-1 gap-5 xl:grid-cols-2">
               <ActivityGuidance activities={risk?.activityGuidance} aqi={current.aqi} />
-              <div className="rounded-2xl border border-emerald-500/20 bg-[#0c1412] p-1">
+              <div className="rounded-2xl border border-emerald-400/25 bg-[#081512] p-1">
                 <ExposureContext aqi={current.aqi} />
               </div>
             </div>
 
-            <section className="mb-5" aria-label="Air quality forecast">
+            <section className="mt-5" aria-label="Air quality forecast">
               <ForecastPanel forecast={forecast} />
             </section>
           </>
