@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
-import { Bookmark, BookmarkCheck, Wind, Activity } from "lucide-react";
+import { Bookmark, BookmarkCheck, Activity } from "lucide-react";
 import { toast } from "sonner";
 import api, { formatApiError } from "@/lib/api";
 import { useLocation } from "@/context/LocationContext";
@@ -76,9 +76,6 @@ export default function AQIMonitor() {
         <div className="mb-5 flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
           <div className="flex min-w-0 flex-1 items-center gap-3">
             <div className="min-w-0 flex-1"><LocationSearch onSelect={setLocation} /></div>
-            <Button variant="outline" onClick={() => window.dispatchEvent(new Event("oxyzen-use-location"))} className="hidden h-11 shrink-0 border-emerald-400/50 bg-emerald-400/5 text-white hover:bg-emerald-400/10 sm:inline-flex">
-              <Wind className="mr-2 h-4 w-4 text-emerald-400" /> Use My Location
-            </Button>
           </div>
           <div className="flex items-center justify-between gap-3 xl:justify-end">
             <p className="text-xs font-data text-slate-400">{current?.updatedAt ? "Last updated: " + new Date(current.updatedAt).toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"}) : "Live air-quality monitoring"}</p>
