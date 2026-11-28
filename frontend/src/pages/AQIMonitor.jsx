@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
-import { Bookmark, BookmarkCheck, Wind, Activity, ShieldCheck, MapPin, Clock3 } from "lucide-react";
+import { Bookmark, BookmarkCheck, Wind, Activity } from "lucide-react";
 import { toast } from "sonner";
 import api, { formatApiError } from "@/lib/api";
 import { useLocation } from "@/context/LocationContext";
