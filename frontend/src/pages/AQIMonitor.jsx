@@ -44,7 +44,7 @@ export default function AQIMonitor() {
       const detail = e?.response?.data?.detail;
       setErrorMessage(
         detail ||
-        \`Live WAQI data is currently unavailable for \${location.name}. There may be no nearby WAQI monitoring station available for this location.\`
+        "Live WAQI data is currently unavailable for " + location.name + ". There may be no nearby WAQI monitoring station available for this location."
       );
       setError(true);
     }
@@ -67,7 +67,7 @@ export default function AQIMonitor() {
         lat: location.lat, lon: location.lon, label: "",
       });
       setSaved(true);
-      toast.success(\`\${location.name} saved to your locations.\`);
+      toast.success(location.name + " saved to your locations.");
     } catch (e) {
       toast.error(formatApiError(e.response?.data?.detail));
     }
